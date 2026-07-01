@@ -17,6 +17,6 @@ window.SITE_CONFIG = {
       androidUrl: null,
     },
   ],
-  company: 'ACLless',
+  company: 'ParNinja LLC',
   year: new Date().getFullYear(),
 };

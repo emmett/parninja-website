@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your Data — ParNinja</title>
+    <meta
+      name="description"
+      content="Request a copy of or deletion of your personal data held by ParNinja LLC."
+    />
+    <meta name="theme-color" content="#388e3c" />
+    <link rel="icon" href="../assets/favicon.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/legal.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <div class="container">
+          <a href="/">← ParNinja</a>
+          <a href="/privacy">Privacy policy</a>
+        </div>
+      </header>
+
+      <main class="container legal-page">
+        <h1>Your data</h1>
+        <p class="legal-updated">
+          Exercise your privacy rights under our
+          <a href="/privacy">Privacy Policy</a>.
+        </p>
+
+        <div class="legal-content">
+          <p>
+            You can request a copy of the personal information we hold about you, or ask us to delete
+            your data. Use the form below to submit a request.
+          </p>
+          <p>We will verify your identity before fulfilling a request and respond within the timeframes required by applicable law.</p>
+          <h2>What you can request</h2>
+          <ul>
+            <li><strong>Request</strong> — a copy of personal information we have about you</li>
+            <li><strong>Delete</strong> — delete personal information we hold about you</li>
+          </ul>
+          <p>
+            For general privacy questions, you can also use the
+            <a href="/privacy#contact">contact form on our privacy page</a> or email
+            <a href="mailto:privacy@parninja.com">privacy@parninja.com</a>.
+          </p>
+        </div>
+
+        <section class="contact-section" id="request" aria-labelledby="request-heading">
+          <h2 id="request-heading">Submit a data request</h2>
+          <p>
+            Include enough detail for us to locate your information. We may follow up to confirm your
+            identity before processing the request.
+          </p>
+
+          <p class="form-notice" id="form-success" hidden>
+            Thank you — your request was submitted. We will respond by email as soon as we can.
+          </p>
+
+          <form
+            class="contact-form"
+            id="data-request-form"
+            action="https://formsubmit.co/privacy@parninja.com"
+            method="POST"
+          >
+            <input type="hidden" name="_subject" value="ParNinja data request" />
+            <input type="hidden" name="_captcha" value="false" />
+            <input type="hidden" name="_next" value="https://parninja.com/data?sent=1" />
+            <input type="text" name="_honey" tabindex="-1" autocomplete="off" hidden />
+
+            <label>
+              Request type
+              <select name="request_type" required>
+                <option value="">Select a request type</option>
+                <option value="Request — copy of my data">Request — copy of my data</option>
+                <option value="Delete — delete my data">Delete — delete my data</option>
+              </select>
+            </label>
+
+            <div class="form-row form-row--split">
+              <label>
+                Full name
+                <input type="text" name="name" required autocomplete="name" />
+              </label>
+              <label>
+                Email
+                <input type="email" name="email" required autocomplete="email" />
+              </label>
+            </div>
+
+            <label>
+              App account identifier <span class="label-hint">(optional)</span>
+              <input
+                type="text"
+                name="account_id"
+                autocomplete="off"
+                placeholder="e.g. email used in the app, device ID, or other identifier"
+              />
+            </label>
+
+            <label>
+              Request details
+              <textarea
+                name="message"
+                required
+                placeholder="Describe your request and any information that will help us locate your data."
+              ></textarea>
+            </label>
+
+            <label class="checkbox-label">
+              <input type="checkbox" name="confirm" value="yes" required />
+              <span>I confirm that the information provided is accurate and that I am the person, or authorized agent of the person, this request concerns.</span>
+            </label>
+
+            <button type="submit" class="form-submit">Submit request</button>
+          </form>
+
+          <div class="address-block">
+            <p>
+              You may also email requests to
+              <a href="mailto:privacy@parninja.com">privacy@parninja.com</a> or write to:
+            </p>
+            <p>
+              <strong>ParNinja LLC</strong><br />
+              30 N Gould St Ste N<br />
+              Sheridan, WY 82801<br />
+              United States
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container">
+          <p>
+            &copy; <span id="footer-year"></span> ParNinja LLC.
+            <a href="/">Home</a> · <a href="/privacy">Privacy</a>
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+      if (new URLSearchParams(window.location.search).get('sent') === '1') {
+        document.getElementById('form-success').hidden = false;
+        document.getElementById('data-request-form').hidden = true;
+        history.replaceState(null, '', window.location.pathname + '#request');
+      }
+    </script>
+  </body>
+</html>

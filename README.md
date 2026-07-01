@@ -1,8 +1,24 @@
 # parninja.com
 
-Static landing page for [parninja.com](https://parninja.com) — app store links for ParNinja and future ACLless apps.
+Static landing page for [parninja.com](https://parninja.com) — app store links for ParNinja and future ParNinja LLC apps.
 
 Hosted on **GitHub Pages** (separate from the [parninja](https://github.com/emmett/parninja) app repo).
+
+## Pages
+
+- `/` — landing page with app store links
+- `/privacy` — privacy policy and contact form
+- `/data` — data access, correction, and deletion requests
+
+## Contact form
+
+The privacy page uses [FormSubmit](https://formsubmit.co) to deliver messages to `privacy@parninja.com`. On first use, FormSubmit sends a confirmation email to that address — click the link to activate.
+
+Edit policy text in `privacy/policy-body.html`, then rebuild:
+
+```bash
+python3 scripts/build-privacy.py
+```
 
 ## Local preview
 
