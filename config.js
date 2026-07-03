@@ -12,7 +12,6 @@ window.SITE_CONFIG = {
       name: 'ParNinja',
       description:
         'Comprehensive golf statistics and performance tracking — rounds, strokes gained, club analytics, and more.',
-      icon: 'assets/icon.png',
       iosUrl: null,
       androidUrl: null,
     },

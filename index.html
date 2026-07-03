@@ -35,11 +35,92 @@
                 improve your game.
               </p>
             </div>
-            <div class="hero-visual" aria-hidden="true">
-              <div class="app-showcase">
-                <img src="assets/icon.png" alt="" id="hero-icon" />
+          </div>
+        </section>
+
+        <section class="screenshots-section" aria-labelledby="screenshots-heading">
+          <p class="section-label" id="screenshots-heading">See it in action</p>
+          <div class="carousel" id="screenshot-carousel">
+            <div class="carousel-viewport">
+              <div class="carousel-track" id="carousel-track">
+                <div class="carousel-slide">
+                  <img
+                    src="assets/screenshots/round-averages.png"
+                    alt="Round averages showing accuracy, short game, and putting stats"
+                    width="390"
+                    height="844"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="carousel-slide">
+                  <img
+                    src="assets/screenshots/club-distances.png"
+                    alt="Club distances with average yardage and shot distribution"
+                    width="390"
+                    height="844"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="carousel-slide">
+                  <img
+                    src="assets/screenshots/approach-results.png"
+                    alt="Approach results by distance with greens hit percentages"
+                    width="390"
+                    height="844"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="carousel-slide">
+                  <img
+                    src="assets/screenshots/driver.png"
+                    alt="Driver performance with aim tendency and shot distribution"
+                    width="390"
+                    height="844"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="carousel-slide">
+                  <img
+                    src="assets/screenshots/putter.png"
+                    alt="Putting performance overview and putt distance breakdown"
+                    width="390"
+                    height="844"
+                    loading="lazy"
+                  />
+                </div>
               </div>
             </div>
+            <button
+              type="button"
+              class="carousel-btn carousel-btn-prev"
+              aria-label="Previous screenshot"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M15 18l-6-6 6-6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="carousel-btn carousel-btn-next"
+              aria-label="Next screenshot"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 18l6-6-6-6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div class="carousel-dots" role="tablist" aria-label="Screenshot navigation"></div>
           </div>
         </section>
 
@@ -62,6 +143,113 @@
 
     <script>
       (function () {
+        initCarousel(document.getElementById('screenshot-carousel'));
+
+        function initCarousel(root) {
+          if (!root) return;
+
+          const track = root.querySelector('.carousel-track');
+          const slides = Array.from(root.querySelectorAll('.carousel-slide'));
+          const dotsContainer = root.querySelector('.carousel-dots');
+          const prevBtn = root.querySelector('.carousel-btn-prev');
+          const nextBtn = root.querySelector('.carousel-btn-next');
+          let index = 0;
+          let autoplayTimer = null;
+          let touchStartX = 0;
+
+          slides.forEach(function (_, i) {
+            const dot = document.createElement('button');
+            dot.type = 'button';
+            dot.className = 'carousel-dot';
+            dot.setAttribute('role', 'tab');
+            dot.setAttribute('aria-label', 'Go to screenshot ' + (i + 1));
+            dot.addEventListener('click', function () {
+              goTo(i);
+              restartAutoplay();
+            });
+            dotsContainer.appendChild(dot);
+          });
+
+          const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
+
+          function goTo(i) {
+            index = (i + slides.length) % slides.length;
+            track.style.transform = 'translateX(-' + index * 100 + '%)';
+            dots.forEach(function (dot, dotIndex) {
+              const active = dotIndex === index;
+              dot.classList.toggle('is-active', active);
+              dot.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+          }
+
+          function next() {
+            goTo(index + 1);
+          }
+
+          function prev() {
+            goTo(index - 1);
+          }
+
+          function startAutoplay() {
+            stopAutoplay();
+            autoplayTimer = window.setInterval(next, 5000);
+          }
+
+          function stopAutoplay() {
+            if (autoplayTimer) {
+              window.clearInterval(autoplayTimer);
+              autoplayTimer = null;
+            }
+          }
+
+          function restartAutoplay() {
+            stopAutoplay();
+            startAutoplay();
+          }
+
+          prevBtn.addEventListener('click', function () {
+            prev();
+            restartAutoplay();
+          });
+
+          nextBtn.addEventListener('click', function () {
+            next();
+            restartAutoplay();
+          });
+
+          root.addEventListener('mouseenter', stopAutoplay);
+          root.addEventListener('mouseleave', startAutoplay);
+          root.addEventListener('focusin', stopAutoplay);
+          root.addEventListener('focusout', function (event) {
+            if (!root.contains(event.relatedTarget)) {
+              startAutoplay();
+            }
+          });
+
+          root.addEventListener(
+            'touchstart',
+            function (event) {
+              touchStartX = event.changedTouches[0].screenX;
+            },
+            { passive: true }
+          );
+
+          root.addEventListener(
+            'touchend',
+            function (event) {
+              const delta = event.changedTouches[0].screenX - touchStartX;
+              if (Math.abs(delta) < 40) return;
+              if (delta < 0) next();
+              else prev();
+              restartAutoplay();
+            },
+            { passive: true }
+          );
+
+          goTo(0);
+          startAutoplay();
+        }
+
         const config = window.SITE_CONFIG;
         if (!config) return;
 
@@ -81,22 +269,13 @@
           const header = document.createElement('div');
           header.className = 'app-card-header';
 
-          const icon = document.createElement('img');
-          icon.src = app.icon;
-          icon.alt = app.name + ' app icon';
-          icon.width = 64;
-          icon.height = 64;
-
-          const textWrap = document.createElement('div');
           const title = document.createElement('h2');
           title.textContent = app.name;
           const desc = document.createElement('p');
           desc.textContent = app.description;
-          textWrap.appendChild(title);
-          textWrap.appendChild(desc);
 
-          header.appendChild(icon);
-          header.appendChild(textWrap);
+          header.appendChild(title);
+          header.appendChild(desc);
 
           const links = document.createElement('div');
           links.className = 'store-links';
