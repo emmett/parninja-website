@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Support — ParNinja</title>
+    <meta
+      name="description"
+      content="Get help with ParNinja. Send a message to our support team."
+    />
+    <meta name="theme-color" content="#388e3c" />
+    <link rel="icon" href="../assets/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/legal.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <div class="container">
+          <a href="/">← ParNinja</a>
+          <a href="mailto:support@parninja.com">support@parninja.com</a>
+        </div>
+      </header>
+
+      <main class="container legal-page">
+        <h1>Support</h1>
+        <p class="legal-updated">
+          Questions about the app, account help, or feedback? Send us a message.
+        </p>
+
+        <section class="contact-section" id="contact" aria-labelledby="contact-heading">
+          <h2 id="contact-heading">Contact support</h2>
+          <p>
+            We read every message. Include as much detail as you can and we will get back to you
+            soon.
+          </p>
+
+          <p class="form-notice" id="form-success" hidden>
+            Thank you — your message was sent. We will get back to you shortly.
+          </p>
+
+          <form
+            class="contact-form"
+            id="support-form"
+            action="https://formsubmit.co/support@parninja.com"
+            method="POST"
+          >
+            <input type="hidden" name="_subject" value="ParNinja support" />
+            <input type="hidden" name="_captcha" value="false" />
+            <input type="hidden" name="_next" value="https://parninja.com/support?sent=1" />
+            <input type="text" name="_honey" tabindex="-1" autocomplete="off" hidden />
+
+            <div class="form-row form-row--split">
+              <label>
+                Name
+                <input type="text" name="name" required autocomplete="name" />
+              </label>
+              <label>
+                Email
+                <input type="email" name="email" required autocomplete="email" />
+              </label>
+            </div>
+
+            <label>
+              Subject
+              <select name="subject">
+                <option value="App help">App help</option>
+                <option value="Account / login">Account / login</option>
+                <option value="Bug report">Bug report</option>
+                <option value="Feature request">Feature request</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              Message
+              <textarea name="message" required placeholder="How can we help?"></textarea>
+            </label>
+
+            <button type="submit" class="form-submit">Send message</button>
+          </form>
+
+          <div class="address-block">
+            <p>
+              You can also email us directly at
+              <a href="mailto:support@parninja.com">support@parninja.com</a>.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="container">
+          <p>
+            &copy; <span id="footer-year"></span> ParNinja LLC.
+            <a href="/">Home</a> · <a href="/privacy">Privacy</a> · <a href="/data">Your data</a>
+          </p>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+      if (new URLSearchParams(window.location.search).get('sent') === '1') {
+        document.getElementById('form-success').hidden = false;
+        document.getElementById('support-form').hidden = true;
+        history.replaceState(null, '', window.location.pathname + '#contact');
+      }
+    </script>
+  </body>
+</html>
