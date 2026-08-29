@@ -12,7 +12,7 @@ window.SITE_CONFIG = {
       name: 'ParNinja',
       description:
         'Comprehensive golf statistics and performance tracking — rounds, strokes gained, club analytics, and more.',
-      iosUrl: null,
+      iosUrl: 'https://apps.apple.com/us/app/parninja/id6747279812',
       androidUrl: null,
     },
   ],
