@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Watch — ParNinja</title>
+    <meta name="description" content="Watch a shared ParNinja hole replay." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#1b3d1f" />
+    <link rel="icon" href="../assets/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/watch.css" />
+    <script src="../config.js"></script>
+  </head>
+  <body>
+    <div class="watch-app">
+      <header class="watch-top">
+        <div class="watch-brand">
+          <a class="brand-link" href="../">
+            <img src="../assets/icon.png" alt="" width="28" height="28" />
+            <span id="brand-name">ParNinja</span>
+          </a>
+          <div class="watch-meta">
+            <p class="course" id="meta-course">Loading…</p>
+            <p class="sub" id="meta-sub"></p>
+          </div>
+        </div>
+        <div class="scorecard-wrap" aria-label="Scorecard">
+          <div class="scorecard" id="scorecard" role="table"></div>
+        </div>
+      </header>
+
+      <div class="watch-map-wrap">
+        <div id="watch-map" role="img" aria-label="Hole map replay"></div>
+        <div class="map-empty" id="map-empty" aria-live="polite">
+          <p>No GPS strokes on this hole. Pick another hole from the scorecard.</p>
+        </div>
+      </div>
+
+      <footer class="watch-transport">
+        <div class="scan-group" aria-label="Scan controls">
+          <button type="button" class="scan-btn hole" id="btn-prev-hole" title="Previous hole" aria-label="Previous hole">
+            ◀ Hole
+          </button>
+          <button type="button" class="scan-btn" id="btn-prev-stroke" title="Previous stroke" aria-label="Previous stroke">
+            ‹
+          </button>
+          <button type="button" class="scan-btn" id="btn-next-stroke" title="Next stroke" aria-label="Next stroke">
+            ›
+          </button>
+          <button type="button" class="scan-btn hole" id="btn-next-hole" title="Next hole" aria-label="Next hole">
+            Hole ▶
+          </button>
+        </div>
+        <div class="shot-meta">
+          <p class="primary" id="shot-primary">—</p>
+          <p class="secondary" id="shot-secondary"></p>
+        </div>
+        <a class="cta-app" id="cta-app" href="#" target="_blank" rel="noopener noreferrer">
+          Open in ParNinja
+        </a>
+      </footer>
+    </div>
+
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <script src="js/pinLabel.js"></script>
+    <script src="js/watch.js"></script>
+  </body>
+</html>

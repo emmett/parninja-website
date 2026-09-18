@@ -1,0 +1,209 @@
+{
+  "v": 1,
+  "meta": {
+    "course": "Quail Hollow Demo",
+    "tees": "Blue",
+    "datePlayed": "2026-09-12",
+    "playerDisplayName": "Demo Golfer"
+  },
+  "holes": [
+    {
+      "holeNumber": 1,
+      "par": 4,
+      "score": 4,
+      "distance": 392,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 392,
+          "SGA": 0.12,
+          "position": { "latitude": 35.12895, "longitude": -80.8412 }
+        },
+        {
+          "club": "7I",
+          "lie": "Fairway",
+          "distanceRemaining": 148,
+          "SGA": -0.05,
+          "position": { "latitude": 35.13085, "longitude": -80.84055 }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 0,
+          "SGA": 0.08,
+          "strokeCount": 2,
+          "firstPuttDistance": 6.5,
+          "position": { "latitude": 35.13195, "longitude": -80.8402 }
+        }
+      ]
+    },
+    {
+      "holeNumber": 2,
+      "par": 3,
+      "score": 3,
+      "distance": 168,
+      "strokes": [
+        {
+          "club": "6I",
+          "lie": "Tee",
+          "distanceRemaining": 168,
+          "SGA": 0.22,
+          "position": { "latitude": 35.1324, "longitude": -80.8394 }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 0,
+          "SGA": 0.04,
+          "strokeCount": 2,
+          "firstPuttDistance": 4.2,
+          "position": { "latitude": 35.13355, "longitude": -80.83895 }
+        }
+      ]
+    },
+    {
+      "holeNumber": 3,
+      "par": 5,
+      "score": 4,
+      "distance": 495,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 495,
+          "SGA": 0.35,
+          "position": { "latitude": 35.1341, "longitude": -80.8416 }
+        },
+        {
+          "club": "9I",
+          "lie": "Fairway",
+          "distanceRemaining": 233,
+          "SGA": 0.18,
+          "position": { "latitude": 35.13605, "longitude": -80.8407 }
+        },
+        {
+          "club": "PW",
+          "lie": "Fairway",
+          "distanceRemaining": 100,
+          "SGA": 0.15,
+          "position": { "latitude": 35.13705, "longitude": -80.84015 }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 0,
+          "SGA": 0.1,
+          "strokeCount": 1,
+          "firstPuttDistance": 3.67,
+          "position": { "latitude": 35.1378, "longitude": -80.83975 }
+        }
+      ]
+    },
+    {
+      "holeNumber": 4,
+      "par": 4,
+      "score": 5,
+      "distance": 410,
+      "strokes": []
+    },
+    {
+      "holeNumber": 5,
+      "par": 4,
+      "score": 4,
+      "distance": 385,
+      "strokes": []
+    },
+    {
+      "holeNumber": 6,
+      "par": 3,
+      "score": 2,
+      "distance": 155,
+      "strokes": []
+    },
+    {
+      "holeNumber": 7,
+      "par": 5,
+      "score": 5,
+      "distance": 520,
+      "strokes": []
+    },
+    {
+      "holeNumber": 8,
+      "par": 4,
+      "score": 4,
+      "distance": 365,
+      "strokes": []
+    },
+    {
+      "holeNumber": 9,
+      "par": 4,
+      "score": 5,
+      "distance": 425,
+      "strokes": []
+    },
+    {
+      "holeNumber": 10,
+      "par": 4,
+      "score": 4,
+      "distance": 400,
+      "strokes": []
+    },
+    {
+      "holeNumber": 11,
+      "par": 3,
+      "score": 3,
+      "distance": 175,
+      "strokes": []
+    },
+    {
+      "holeNumber": 12,
+      "par": 5,
+      "score": 6,
+      "distance": 540,
+      "strokes": []
+    },
+    {
+      "holeNumber": 13,
+      "par": 4,
+      "score": 4,
+      "distance": 375,
+      "strokes": []
+    },
+    {
+      "holeNumber": 14,
+      "par": 4,
+      "score": 3,
+      "distance": 350,
+      "strokes": []
+    },
+    {
+      "holeNumber": 15,
+      "par": 3,
+      "score": 3,
+      "distance": 190,
+      "strokes": []
+    },
+    {
+      "holeNumber": 16,
+      "par": 4,
+      "score": 4,
+      "distance": 405,
+      "strokes": []
+    },
+    {
+      "holeNumber": 17,
+      "par": 4,
+      "score": 5,
+      "distance": 440,
+      "strokes": []
+    },
+    {
+      "holeNumber": 18,
+      "par": 5,
+      "score": 5,
+      "distance": 510,
+      "strokes": []
+    }
+  ]
+}

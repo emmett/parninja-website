@@ -9,6 +9,91 @@ Hosted on **GitHub Pages** (separate from the [parninja](https://github.com/emme
 - `/` — landing page with app store links
 - `/privacy` — privacy policy and contact form
 - `/data` — data access, correction, and deletion requests
+- `/support` — support contact form
+- `/watch` — shared hole scanner (scorecard + map tracers). Noindexed via meta robots and `robots.txt`.
+
+## Watch page — payload handoff (testing today)
+
+The viewer loads a **round JSON document** and scans hole-by-hole / stroke-by-stroke. There is no share API yet; handoff is file-based.
+
+### Schema (v1)
+
+```json
+{
+  "v": 1,
+  "meta": {
+    "course": "Course name",
+    "tees": "Blue",
+    "datePlayed": "2026-09-12",
+    "playerDisplayName": "optional"
+  },
+  "holes": [
+    {
+      "holeNumber": 1,
+      "par": 4,
+      "score": 4,
+      "distance": 392,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 392,
+          "SGA": 0.12,
+          "position": { "latitude": 35.12895, "longitude": -80.8412 }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 0,
+          "SGA": 0.08,
+          "strokeCount": 1,
+          "firstPuttDistance": 3.67,
+          "position": { "latitude": 35.13195, "longitude": -80.8402 }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Stroke fields that matter for the map**
+
+| Field | Required | Notes |
+|-------|----------|--------|
+| `position.latitude` / `longitude` | Yes (for GPS holes) | Pins + tracer |
+| `club` | Yes | Pill label (`DR` → `Dr`) |
+| `lie` | Recommended | Pill color (`Tee`, `Fairway`, `Rough`, `Sand`, `Green`, `Recovery`) |
+| `SGA` | Optional | Shown in shot meta |
+| `distanceRemaining` | Optional | HUD context |
+| `strokeCount` / `firstPuttDistance` | Putts | `firstPuttDistance` is **yards**; label shows feet (`1p 11'`) |
+
+Shot yardage on non-putt pills is computed GPS-to-GPS (this stroke → next), not from `distanceRemaining`. Include all 18 holes for a full scorecard; holes without GPS strokes still show score shapes but no map path.
+
+Reference fixture: [`watch/fixtures/sample-round.json`](watch/fixtures/sample-round.json).
+
+### How to test your own payload
+
+1. Drop a JSON file in `watch/fixtures/` (e.g. `my-round.json`).
+2. Open `/watch/?fixture=my-round` (filename without `.json`).
+3. Default with no query: loads `sample-round`.
+
+Local:
+
+```bash
+python3 -m http.server 8080
+# http://localhost:8080/watch/
+# http://localhost:8080/watch/?fixture=my-round
+```
+
+Production (after deploy): `https://parninja.com/watch/` and `https://parninja.com/watch/?fixture=my-round`.
+
+### Not built yet (app → web share)
+
+- `#r=` gzip+base64url hole blob in the URL hash
+- Hosted short ids (`/watch/abc12`)
+- In-app Share sheet uploading this JSON
+
+Until those exist, testing means committing a fixture under `watch/fixtures/` or serving one locally.
 
 ## Contact form
 
