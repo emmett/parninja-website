@@ -74,11 +74,31 @@
     return distanceYards(stroke.position, next.position);
   }
 
+  /**
+   * True bearing in degrees from A to B (0 = north), matching parninja lib/utils/gps.ts.
+   */
+  function bearingDegrees(from, to) {
+    if (!from || !to) return 0;
+    var toRad = Math.PI / 180;
+    var dLon = (to.longitude - from.longitude) * toRad;
+    var lat1 = from.latitude * toRad;
+    var lat2 = to.latitude * toRad;
+    var y = Math.sin(dLon) * Math.cos(lat2);
+    var x =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    if (!Number.isFinite(y) || !Number.isFinite(x)) return 0;
+    var bearing = (Math.atan2(y, x) * 180) / Math.PI;
+    if (!Number.isFinite(bearing)) return 0;
+    return (bearing + 360) % 360;
+  }
+
   global.PinLabel = {
     LIE_PIN_COLORS: LIE_PIN_COLORS,
     getStrokePinLabel: getStrokePinLabel,
     lieColor: lieColor,
     distanceYards: distanceYards,
     shotDistanceForStroke: shotDistanceForStroke,
+    bearingDegrees: bearingDegrees,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

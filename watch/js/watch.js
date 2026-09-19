@@ -1,12 +1,16 @@
 /**
  * ParNinja /watch — Masters-style hole scanner (scorecard + map tracers).
- * Scan is primary; continuous play is out of scope for v1.
+ * Scan manually or Play to auto-advance strokes through the round.
  */
 (function () {
   'use strict';
 
   var TRAIL_SOURCE = 'hole-trail';
   var TRAIL_LAYER = 'hole-trail-line';
+  var TRAIL_OUTLINE = 'hole-trail-outline';
+  var POINTS_SOURCE = 'hole-points';
+  var POINTS_LAYER = 'hole-points-circle';
+  var MS_PER_STROKE = 1600;
   var ESRI_SAT =
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
@@ -17,6 +21,11 @@
     strokeCursor: -1,
     map: null,
     markers: [],
+    playing: false,
+    speed: 1,
+    playTimer: null,
+    /** Hole index the camera was last framed for — reframe only on hole change (app behavior). */
+    cameraHoleIndex: -1,
   };
 
   function $(id) {
@@ -27,12 +36,6 @@
     if (!hole || !hole.strokes) return [];
     return hole.strokes.filter(function (s) {
       return s.position && s.position.latitude != null && s.position.longitude != null;
-    });
-  }
-
-  function holesWithGps(round) {
-    return (round.holes || []).filter(function (h) {
-      return gpsStrokes(h).length > 0;
     });
   }
 
@@ -138,6 +141,7 @@
 
     root.querySelectorAll('[data-hole-index]').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        pausePlayback();
         selectHole(Number(btn.getAttribute('data-hole-index')), true);
       });
     });
@@ -197,7 +201,7 @@
 
     if (state.strokeCursor < 0) {
       primary.textContent = holeLine;
-      secondary.textContent = 'Scan to reveal shots';
+      secondary.textContent = 'Press Play or scan to reveal shots';
       return;
     }
 
@@ -224,11 +228,17 @@
 
     $('btn-prev-hole').disabled = atFirstHole;
     $('btn-next-hole').disabled = atLastHole;
-
-    // Prev stroke: allow going back, or jump to previous hole's last stroke
     $('btn-prev-stroke').disabled = atFirstStroke && atFirstHole;
-    // Next stroke: allow advance into next hole when at end
     $('btn-next-stroke').disabled = atLastStroke && atLastHole;
+
+    var playBtn = $('btn-play');
+    playBtn.textContent = state.playing ? '❚❚ Pause' : '▶ Play';
+    playBtn.title = state.playing ? 'Pause' : 'Play round';
+    playBtn.setAttribute('aria-label', state.playing ? 'Pause' : 'Play round');
+    playBtn.classList.toggle('is-playing', state.playing);
+    playBtn.disabled = atLastStroke && atLastHole && !state.playing;
+
+    $('btn-speed').textContent = state.speed + 'x';
   }
 
   /* —— Map —— */
@@ -245,7 +255,22 @@
     if (!map.getSource(TRAIL_SOURCE)) {
       map.addSource(TRAIL_SOURCE, {
         type: 'geojson',
-        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} },
+        data: {
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: [] },
+          properties: {},
+        },
+      });
+      map.addLayer({
+        id: TRAIL_OUTLINE,
+        type: 'line',
+        source: TRAIL_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#1b5e20',
+          'line-width': 7,
+          'line-opacity': 0.85,
+        },
       });
       map.addLayer({
         id: TRAIL_LAYER,
@@ -253,9 +278,37 @@
         source: TRAIL_SOURCE,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': '#1b5e20',
-          'line-width': 4,
-          'line-opacity': 0.92,
+          'line-color': '#ffffff',
+          'line-width': 3.5,
+          'line-opacity': 0.98,
+        },
+      });
+    }
+    if (!map.getSource(POINTS_SOURCE)) {
+      map.addSource(POINTS_SOURCE, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: POINTS_LAYER,
+        type: 'circle',
+        source: POINTS_SOURCE,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': [
+            'case',
+            ['==', ['get', 'current'], 1],
+            '#c62828',
+            '#ffffff',
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#1b5e20',
+          'circle-opacity': [
+            'case',
+            ['==', ['get', 'revealed'], 1],
+            1,
+            0.35,
+          ],
         },
       });
     }
@@ -266,27 +319,61 @@
     state.map.getSource(TRAIL_SOURCE).setData({
       type: 'Feature',
       properties: {},
-      geometry: { type: 'LineString', coordinates: coords.length ? coords : [] },
+      geometry: {
+        type: 'LineString',
+        coordinates: coords.length >= 2 ? coords : [],
+      },
     });
   }
 
-  function zoomForClub(club) {
-    var c = (club || '').toUpperCase();
-    if (c.indexOf('PU') === 0) return 17.5;
-    if (c.indexOf('DR') === 0 || c.indexOf('DRIVER') >= 0) return 15.2;
-    return 16.2;
+  function setPoints(strokes, revealedCount, currentIndex) {
+    ensureTrailLayers();
+    var features = strokes.map(function (stroke, i) {
+      return {
+        type: 'Feature',
+        properties: {
+          revealed: i < revealedCount ? 1 : 0,
+          current: i === currentIndex ? 1 : 0,
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [stroke.position.longitude, stroke.position.latitude],
+        },
+      };
+    });
+    state.map.getSource(POINTS_SOURCE).setData({
+      type: 'FeatureCollection',
+      features: features,
+    });
   }
 
-  function fitOrFly(strokes, focusIndex) {
+  /**
+   * Frame camera for a hole — matches app round map:
+   * fitToCoordinates(path) + heading (bearing first→last).
+   * Only call when the hole changes, not on every stroke.
+   */
+  function frameHoleCamera(strokes, force) {
     var map = state.map;
-    if (!strokes.length) return;
+    if (!map || !strokes.length) return;
+    if (!force && state.cameraHoleIndex === state.holeIndex) return;
+    state.cameraHoleIndex = state.holeIndex;
 
-    if (focusIndex >= 0 && strokes[focusIndex]) {
-      var p = strokes[focusIndex].position;
+    var bearing =
+      strokes.length >= 2
+        ? PinLabel.bearingDegrees(
+            strokes[0].position,
+            strokes[strokes.length - 1].position
+          )
+        : 0;
+
+    if (strokes.length === 1) {
+      var only = strokes[0].position;
       map.easeTo({
-        center: [p.longitude, p.latitude],
-        zoom: zoomForClub(strokes[focusIndex].club),
-        duration: 450,
+        center: [only.longitude, only.latitude],
+        zoom: 17.2,
+        bearing: bearing,
+        pitch: 0,
+        duration: 400,
       });
       return;
     }
@@ -295,10 +382,36 @@
     strokes.forEach(function (s) {
       bounds.extend([s.position.longitude, s.position.latitude]);
     });
-    map.fitBounds(bounds, { padding: 64, maxZoom: 16.5, duration: 500 });
+
+    // Same edgePadding as app fitToCoordinates — fit the path itself, don't inflate deltas
+    map.fitBounds(bounds, {
+      padding: { top: 80, right: 50, bottom: 80, left: 50 },
+      bearing: bearing,
+      pitch: 0,
+      duration: 400,
+      maxZoom: 18.5,
+    });
   }
 
-  function renderMapContent() {
+  function makePinElement(stroke, label, isCurrent, isGhost) {
+    var stack = document.createElement('div');
+    stack.className =
+      'pin-stack' +
+      (isCurrent ? ' current' : '') +
+      (isGhost ? ' ghost' : '');
+
+    var pill = document.createElement('div');
+    pill.className = 'pin-pill' + (isCurrent ? ' current' : '');
+    if (stroke.lie === 'Sand') pill.classList.add('sand');
+    pill.style.backgroundColor = PinLabel.lieColor(stroke.lie);
+    pill.textContent = label;
+
+    stack.appendChild(pill);
+    return stack;
+  }
+
+  function renderMapContent(opts) {
+    opts = opts || {};
     var hole = currentHole();
     var strokes = gpsStrokes(hole);
     var empty = $('map-empty');
@@ -306,6 +419,7 @@
 
     if (!strokes.length) {
       setTrail([]);
+      setPoints([], 0, -1);
       empty.classList.add('visible');
       updateShotMeta();
       updateButtons();
@@ -313,31 +427,34 @@
     }
     empty.classList.remove('visible');
 
-    var revealed = state.strokeCursor < 0 ? [] : strokes.slice(0, state.strokeCursor + 1);
+    var revealedCount = state.strokeCursor < 0 ? 0 : state.strokeCursor + 1;
+    var revealed = strokes.slice(0, revealedCount);
     var coords = revealed.map(function (s) {
       return [s.position.longitude, s.position.latitude];
     });
     setTrail(coords);
+    setPoints(strokes, revealedCount, state.strokeCursor);
 
-    revealed.forEach(function (stroke, i) {
+    // Full hole pins: ghosts for not-yet-played, solid for revealed
+    strokes.forEach(function (stroke, i) {
       var dist = PinLabel.shotDistanceForStroke(strokes, i);
       var label = PinLabel.getStrokePinLabel(stroke, dist);
-      var el = document.createElement('div');
-      el.className = 'pin-pill';
-      if (stroke.lie === 'Sand') el.classList.add('sand');
-      if (i === state.strokeCursor) el.classList.add('current');
-      el.style.backgroundColor = PinLabel.lieColor(stroke.lie);
-      el.textContent = label;
+      var isRevealed = i < revealedCount;
+      var isCurrent = i === state.strokeCursor;
+      var el = makePinElement(stroke, label, isCurrent, !isRevealed);
 
-      var marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      var marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'bottom',
+        offset: [0, -12],
+      })
         .setLngLat([stroke.position.longitude, stroke.position.latitude])
         .addTo(state.map);
       state.markers.push(marker);
     });
 
-    fitOrFly(strokes, state.strokeCursor >= 0 ? state.strokeCursor : -1);
-    if (state.strokeCursor < 0 && strokes.length) {
-      fitOrFly(strokes, -1);
+    if (opts.reframeCamera) {
+      frameHoleCamera(strokes, true);
     }
 
     updateShotMeta();
@@ -360,8 +477,8 @@
         },
         layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
       },
-      center: [-116.2135, 43.622],
-      zoom: 15,
+      center: [-116.1648, 43.5912],
+      zoom: 15.5,
       attributionControl: true,
     });
 
@@ -370,8 +487,64 @@
 
     map.on('load', function () {
       ensureTrailLayers();
+      map.resize();
       if (cb) cb();
     });
+  }
+
+  /* —— Playback —— */
+
+  function clearPlayTimer() {
+    if (state.playTimer) {
+      clearTimeout(state.playTimer);
+      state.playTimer = null;
+    }
+  }
+
+  function pausePlayback() {
+    state.playing = false;
+    clearPlayTimer();
+    updateButtons();
+  }
+
+  function scheduleNextPlayTick() {
+    clearPlayTimer();
+    if (!state.playing) return;
+    var delay = MS_PER_STROKE / state.speed;
+    state.playTimer = setTimeout(function () {
+      var advanced = advanceStroke(false);
+      if (!advanced) {
+        pausePlayback();
+        return;
+      }
+      scheduleNextPlayTick();
+    }, delay);
+  }
+
+  function togglePlayback() {
+    if (state.playing) {
+      pausePlayback();
+      return;
+    }
+    var hole = currentHole();
+    var strokes = gpsStrokes(hole);
+    var atEnd =
+      state.holeIndex >= state.round.holes.length - 1 &&
+      (strokes.length === 0 || state.strokeCursor >= strokes.length - 1);
+    if (atEnd) {
+      // Restart from first GPS hole
+      var start = firstGpsHoleIndex(state.round);
+      selectHole(start, true);
+    }
+    state.playing = true;
+    updateButtons();
+    scheduleNextPlayTick();
+  }
+
+  function cycleSpeed() {
+    state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : 1;
+    updateButtons();
+    if (state.playing) scheduleNextPlayTick();
   }
 
   /* —— Navigation —— */
@@ -379,14 +552,14 @@
   function selectHole(index, resetStroke) {
     if (!state.round) return;
     if (index < 0 || index >= state.round.holes.length) return;
+    var holeChanged = index !== state.holeIndex;
     state.holeIndex = index;
     if (resetStroke) {
-      // Start with tee revealed if GPS exists
       var strokes = gpsStrokes(state.round.holes[index]);
       state.strokeCursor = strokes.length ? 0 : -1;
     }
     renderScorecard();
-    renderMapContent();
+    renderMapContent({ reframeCamera: holeChanged || resetStroke });
 
     var activeBtn = document.querySelector(
       '.scorecard-cell.hole-num[data-hole-index="' + index + '"]'
@@ -396,47 +569,57 @@
     }
   }
 
-  function nextStroke() {
+  /** @returns {boolean} true if advanced */
+  function advanceStroke(fromManual) {
+    if (fromManual) pausePlayback();
     var hole = currentHole();
     var strokes = gpsStrokes(hole);
     if (state.strokeCursor < strokes.length - 1) {
       state.strokeCursor += 1;
-      renderMapContent();
-      return;
+      // Stay framed on the hole — do not re-zoom per stroke (app behavior)
+      renderMapContent({ reframeCamera: false });
+      return true;
     }
-    // Advance to next hole first stroke
     if (state.holeIndex < state.round.holes.length - 1) {
       selectHole(state.holeIndex + 1, true);
+      return true;
     }
+    return false;
+  }
+
+  function nextStroke() {
+    advanceStroke(true);
   }
 
   function prevStroke() {
+    pausePlayback();
     if (state.strokeCursor > 0) {
       state.strokeCursor -= 1;
-      renderMapContent();
+      renderMapContent({ reframeCamera: false });
       return;
     }
     if (state.strokeCursor === 0) {
       state.strokeCursor = -1;
-      renderMapContent();
+      renderMapContent({ reframeCamera: false });
       return;
     }
-    // Jump to previous hole last stroke
     if (state.holeIndex > 0) {
       var prev = state.holeIndex - 1;
       var strokes = gpsStrokes(state.round.holes[prev]);
       state.holeIndex = prev;
       state.strokeCursor = strokes.length ? strokes.length - 1 : -1;
       renderScorecard();
-      renderMapContent();
+      renderMapContent({ reframeCamera: true });
     }
   }
 
   function nextHole() {
+    pausePlayback();
     selectHole(state.holeIndex + 1, true);
   }
 
   function prevHole() {
+    pausePlayback();
     selectHole(state.holeIndex - 1, true);
   }
 
@@ -462,15 +645,8 @@
 
     initMap(function () {
       state.map.resize();
-      renderMapContent();
+      renderMapContent({ reframeCamera: true });
     });
-  }
-
-  function fixtureUrl() {
-    var params = new URLSearchParams(window.location.search);
-    var name = params.get('fixture') || 'sample-round';
-    name = name.replace(/[^a-zA-Z0-9_-]/g, '');
-    return 'fixtures/' + name + '.json';
   }
 
   function bindControls() {
@@ -478,9 +654,14 @@
     $('btn-prev-stroke').addEventListener('click', prevStroke);
     $('btn-next-hole').addEventListener('click', nextHole);
     $('btn-prev-hole').addEventListener('click', prevHole);
+    $('btn-play').addEventListener('click', togglePlayback);
+    $('btn-speed').addEventListener('click', cycleSpeed);
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight') {
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        togglePlayback();
+      } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         nextStroke();
       } else if (e.key === 'ArrowLeft') {
@@ -498,18 +679,15 @@
 
   bindControls();
 
-  fetch(fixtureUrl())
-    .then(function (res) {
-      if (!res.ok) throw new Error('Failed to load fixture');
-      return res.json();
-    })
+  ShareCodec.loadRoundFromUrl()
     .then(boot)
     .catch(function (err) {
       console.error(err);
       $('meta-course').textContent = 'Could not load round';
-      $('meta-sub').textContent = 'Check the share link or try ?fixture=sample-round';
+      $('meta-sub').textContent =
+        'Use #r=… share link or ?fixture=sample-round';
       $('map-empty').classList.add('visible');
       $('map-empty').querySelector('p').textContent =
-        'Unable to load replay data.';
+        (err && err.message) || 'Unable to load replay data.';
     });
 })();

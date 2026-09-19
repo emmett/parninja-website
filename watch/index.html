@@ -18,7 +18,7 @@
       href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/watch.css" />
+    <link rel="stylesheet" href="css/watch.css?v=6" />
     <script src="../config.js"></script>
   </head>
   <body>
@@ -54,6 +54,12 @@
           <button type="button" class="scan-btn" id="btn-prev-stroke" title="Previous stroke" aria-label="Previous stroke">
             ‹
           </button>
+          <button type="button" class="scan-btn play" id="btn-play" title="Play round" aria-label="Play round">
+            ▶ Play
+          </button>
+          <button type="button" class="scan-btn speed" id="btn-speed" title="Playback speed" aria-label="Playback speed">
+            1x
+          </button>
           <button type="button" class="scan-btn" id="btn-next-stroke" title="Next stroke" aria-label="Next stroke">
             ›
           </button>
@@ -72,7 +78,8 @@
     </div>
 
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <script src="js/pinLabel.js"></script>
-    <script src="js/watch.js"></script>
+    <script src="js/pinLabel.js?v=13"></script>
+    <script src="js/shareCodec.js?v=13"></script>
+    <script src="js/watch.js?v=13"></script>
   </body>
 </html>

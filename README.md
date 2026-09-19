@@ -87,13 +87,127 @@ python3 -m http.server 8080
 
 Production (after deploy): `https://parninja.com/watch/` and `https://parninja.com/watch/?fixture=my-round`.
 
-### Not built yet (app → web share)
+### Live share decode
 
-- `#r=` gzip+base64url hole blob in the URL hash
-- Hosted short ids (`/watch/abc12`)
-- In-app Share sheet uploading this JSON
+`#r=` blobs are decoded client-side by `watch/js/shareCodec.js` (gzip or raw DEFLATE → JSON / compact → boot).
 
-Until those exist, testing means committing a fixture under `watch/fixtures/` or serving one locally.
+**Canonical app format = v2 pack** (below). Verbose fixtures remain for local/`?fixture=` testing only.
+
+Still not built: hosted short ids (`/watch/abc12`), in-app Share sheet.
+
+### Convert raw JSON → share formats (comparison)
+
+```bash
+# Compare all encodings for one hole
+python3 scripts/round-to-share.py watch/fixtures/watch-warm-springs-2026-09-11.json --hole 3
+
+# Full round
+python3 scripts/round-to-share.py path/to/round.json
+
+# Emit a pasteable #r= URL (compact text + raw DEFLATE)
+python3 scripts/round-to-share.py path/to/round.json --format compact --encode
+
+# Write raw + .b64 artifacts
+python3 scripts/round-to-share.py path/to/round.json --write /tmp/share-out
+```
+
+Formats: `slim-json`, `arrays`, `pipe`, `binary`, `binary-nometas`, `compact`, `compact-bin`.  
+**App should emit v2 pack JSON** (not these experiment formats). Reference fixture: `watch/fixtures/watch-warm-springs-2026-09-11.v2.json`.
+
+## Watch share — compression & URL handoff (app brief)
+
+Aligned with Notion *[Replay share & web viewer](https://app.notion.com/p/3dcc75393b8581a5bfeac82a13af28d0)*. **Never put GPS in the query string.**
+
+### Encode pipeline (ship this)
+
+```
+v2 pack JSON (no spaces)
+  → gzip level 9
+  → base64url (RFC 4648 §5, strip =)
+  → https://parninja.com/watch/#r=<blob>
+```
+
+If `blob.length > 1500` → hosted short id later (`/watch/abc12`). Soft cap ~1500 for iMessage.
+
+```js
+// App encode
+const json = JSON.stringify(v2Pack); // no spaces
+const gz = gzipSync(utf8Encode(json), { level: 9 });
+const blob = base64Url(gz); // +/ → -_, strip =
+const url = `https://parninja.com/watch/#r=${blob}`;
+
+// Web already decodes: gunzip → JSON.parse → expand → boot()
+```
+
+### Why hash, not query
+
+| Place | Behavior |
+|-------|----------|
+| Query `?data=` | Sent to servers, logged, truncated |
+| Hash `#r=` | Client-only; copied with the link |
+
+### v2 pack schema (canonical)
+
+```json
+{
+  "v": 2,
+  "m": ["Warm Springs", "W", "20260911"],
+  "C": ["7W", "GW", "SW", "PU", "DR", "8I", "9I", "PW", "5I", "LW", "7I"],
+  "L": ["T", "F", "R", "S", "G", "X"],
+  "h": [
+    [4, [4359241, -11616565], [4358991, -11616398], [
+      [0],
+      [1, 2, -188, 148],
+      [2, 2, -16, 20],
+      [3, 4, 2, 26]
+    ]]
+  ]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `m` | `[course, teeShort, YYYYMMDD]` — tee short e.g. `W`→Whites |
+| `C` / `L` | Club dictionary + lie dictionary (`T F R S G X`) |
+| Hole row | `[par, teeµ, greenµ, strokes]` — hole number = index + 1 |
+| µdeg | `round(lat/lng × 1e5)` (~1 m) |
+| First `[c]` | Club at **tee**. `[c, p]` if penalty (e.g. OB re-tee) |
+| First `[c, l]` / `[c, l, p]` | Non-tee start (rare) |
+| Later `[c, l, dlat, dlng]` | Δ from **previous** stroke (+ optional trailing `p`) |
+| Green putt `[c, G, n, ft]` | Position = **green**. `n` = putt count, `ft` = first-putt **feet** |
+| Score | **Do not store.** Unpack: each non-putt = 1, green putt = `n`, plus penalties |
+
+**Omit:** `distanceRemaining`, `SGA` (unless non-zero later), hole yards, stored score, bag, user id, other rounds.
+
+Viewer expands to internal schema (`club`, `lie`, `position`, `strokeCount`, `firstPuttDistance` yards = `ft/3`, `penalty`) then `boot()`.
+
+### Proven size (Warm Springs full 18)
+
+| Payload | Size | `#r=` | Fits ≤1500? |
+|---------|------|-------|-------------|
+| v2 pack JSON | 1796 B | — | — |
+| gzip-9 | 696 B | **928** | Yes |
+| Verbose fixture JSON gzip | — | ~2040 | No |
+
+Full-18 round shares fit in the URL with v2 pack. Prefer hole-scoped shares for privacy when possible.
+
+### App share flow
+
+1. User taps **Share round** / **Share hole** (Premium).
+2. Build v2 pack → gzip → base64url.
+3. If `blob.length ≤ 1500`: copy `https://parninja.com/watch/#r=…`.
+4. Else: POST → hosted id (not built yet).
+5. Native share sheet.
+
+Hash links are irrevocable without changing the data; treat GPS as sensitive.
+
+### Viewer load order (live)
+
+1. `#r=` → decode (gzip / raw DEFLATE / plain) → boot
+2. `?fixture=` → local JSON (dev)
+3. Else empty / error
+
+Reference decode: `watch/js/shareCodec.js` (`parseV2Pack`). Reference pack: `watch/fixtures/watch-warm-springs-2026-09-11.v2.json`.
 
 ## Contact form
 

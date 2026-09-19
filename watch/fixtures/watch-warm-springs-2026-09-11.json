@@ -1,0 +1,962 @@
+{
+  "v": 1,
+  "meta": {
+    "course": "Warm Springs",
+    "tees": "Whites",
+    "datePlayed": "2026-09-11"
+  },
+  "holes": [
+    {
+      "holeNumber": 1,
+      "par": 4,
+      "score": 5,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "7W",
+          "lie": "Tee",
+          "distanceRemaining": 337.39,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.592408098124885,
+            "longitude": -116.16564655435309
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Rough",
+          "distanceRemaining": 76.69,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59052552210838,
+            "longitude": -116.164168964416
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 55.93,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59036978803909,
+            "longitude": -116.16396993409485
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 8.67,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 8.6667,
+          "position": {
+            "latitude": 43.58990993627633,
+            "longitude": -116.16397987937694
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 2,
+      "par": 4,
+      "score": 4,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 402.32,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.58973051083098,
+            "longitude": -116.16463643406897
+          }
+        },
+        {
+          "club": "8I",
+          "lie": "Rough",
+          "distanceRemaining": 116.69,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59090265327564,
+            "longitude": -116.16745049261631
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 27.55,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59132721614985,
+            "longitude": -116.16827595266486
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 1.67,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 1.6667,
+          "position": {
+            "latitude": 43.59144846793141,
+            "longitude": -116.16854022868614
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 3,
+      "par": 5,
+      "score": 4,
+      "distance": 495,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 494.66,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59179146163496,
+            "longitude": -116.16858490699583
+          }
+        },
+        {
+          "club": "9I",
+          "lie": "Rough",
+          "distanceRemaining": 239.7,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.593560946214566,
+            "longitude": -116.17027513693661
+          }
+        },
+        {
+          "club": "PW",
+          "lie": "Fairway",
+          "distanceRemaining": 106.94,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.594185398000846,
+            "longitude": -116.17151347931117
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 3.67,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 3.6667,
+          "position": {
+            "latitude": 43.59473513603859,
+            "longitude": -116.17246119489687
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 4,
+      "par": 3,
+      "score": 3,
+      "distance": 151,
+      "strokes": [
+        {
+          "club": "8I",
+          "lie": "Tee",
+          "distanceRemaining": 151.43,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.594778501469264,
+            "longitude": -116.17156486037761
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 24.09,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59524150189277,
+            "longitude": -116.17286253499664
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 2,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 2,
+          "position": {
+            "latitude": 43.595342622011934,
+            "longitude": -116.17309769809019
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 5,
+      "par": 4,
+      "score": 5,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 383.08,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59600623664984,
+            "longitude": -116.17345772340492
+          }
+        },
+        {
+          "club": "9I",
+          "lie": "Rough",
+          "distanceRemaining": 160.49,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59812208455391,
+            "longitude": -116.17325389768571
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 39.32,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59873580024572,
+            "longitude": -116.17458585622113
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 2.67,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 2.6667,
+          "position": {
+            "latitude": 43.5990574392951,
+            "longitude": -116.1745396457983
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 6,
+      "par": 5,
+      "score": 5,
+      "distance": 503,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 502.87,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.598675275475614,
+            "longitude": -116.17379598966579
+          }
+        },
+        {
+          "club": "7W",
+          "lie": "Sand",
+          "distanceRemaining": 247.85,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59678562055481,
+            "longitude": -116.17251294406711
+          }
+        },
+        {
+          "club": "5I",
+          "lie": "Fairway",
+          "distanceRemaining": 183.17,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59636070161436,
+            "longitude": -116.17206786546542
+          }
+        },
+        {
+          "club": "LW",
+          "lie": "Sand",
+          "distanceRemaining": 21.03,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.594981438925664,
+            "longitude": -116.17114384841746
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 2.33,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 2.3333,
+          "position": {
+            "latitude": 43.59508790558155,
+            "longitude": -116.1709556110309
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 7,
+      "par": 4,
+      "score": 7,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "7W",
+          "lie": "Tee",
+          "distanceRemaining": 382.94,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59462561946205,
+            "longitude": -116.17032127217452
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 152.45,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59296495443464,
+            "longitude": -116.16892849913135
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 90.01,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.592657795701285,
+            "longitude": -116.16835963943413
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 27.89,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59231971898156,
+            "longitude": -116.16782961428932
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 3.33,
+          "SGA": 0,
+          "strokeCount": 3,
+          "firstPuttDistance": 3.3333,
+          "position": {
+            "latitude": 43.59218541623825,
+            "longitude": -116.16757286486647
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 8,
+      "par": 4,
+      "score": 7,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "7W",
+          "lie": "Tee",
+          "distanceRemaining": 390.48,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59212858235619,
+            "longitude": -116.1683666022085
+          }
+        },
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 390.48,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59212858235619,
+            "longitude": -116.1683666022085
+          }
+        },
+        {
+          "club": "7W",
+          "lie": "Rough",
+          "distanceRemaining": 248.45,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59143167524212,
+            "longitude": -116.16707256044745
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 21.19,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.590224152471485,
+            "longitude": -116.16457259293288
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 3.67,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 3.6667,
+          "position": {
+            "latitude": 43.59020929693284,
+            "longitude": -116.16481225638186
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 9,
+      "par": 4,
+      "score": 4,
+      "distance": 159,
+      "strokes": [
+        {
+          "club": "7I",
+          "lie": "Tee",
+          "distanceRemaining": 159.42,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59095301808587,
+            "longitude": -116.16525170959089
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 14.23,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59204601690425,
+            "longitude": -116.1659357832444
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 2,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 2,
+          "position": {
+            "latitude": 43.592130556204346,
+            "longitude": -116.16604746538229
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 10,
+      "par": 4,
+      "score": 5,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 386.36,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59366768034917,
+            "longitude": -116.166043229328
+          }
+        },
+        {
+          "club": "7W",
+          "lie": "Rough",
+          "distanceRemaining": 312.82,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59421442350696,
+            "longitude": -116.16640517076864
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 64.45,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.596132751359136,
+            "longitude": -116.16759278885847
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Fairway",
+          "distanceRemaining": 5.64,
+          "SGA": 0,
+          "strokeCount": 1,
+          "position": {
+            "latitude": 43.59639681195231,
+            "longitude": -116.16816183253337
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 1.33,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 1.3333,
+          "position": {
+            "latitude": 43.59643813173531,
+            "longitude": -116.16819096933446
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 11,
+      "par": 4,
+      "score": 4,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "7W",
+          "lie": "Tee",
+          "distanceRemaining": 320.88,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.596424273107814,
+            "longitude": -116.16750080251974
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 83.59,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59521793011938,
+            "longitude": -116.16523125156617
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 9,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 9,
+          "position": {
+            "latitude": 43.59518634581614,
+            "longitude": -116.164283074411
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 12,
+      "par": 4,
+      "score": 5,
+      "distance": 368,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 367.99,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.5954696616925,
+            "longitude": -116.16360126063431
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 53.68,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.592895092503184,
+            "longitude": -116.16397356152154
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 24.19,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59266113423195,
+            "longitude": -116.1640622751026
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 3.33,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 3.3333,
+          "position": {
+            "latitude": 43.59246723926979,
+            "longitude": -116.16412375102809
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 13,
+      "par": 3,
+      "score": 3,
+      "distance": 143,
+      "strokes": [
+        {
+          "club": "9I",
+          "lie": "Tee",
+          "distanceRemaining": 143.01,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59242221710102,
+            "longitude": -116.16664931538315
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 14.8,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.5932780833833,
+            "longitude": -116.16750918633338
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 1.33,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 1.3333,
+          "position": {
+            "latitude": 43.59335324012632,
+            "longitude": -116.16764141481879
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 14,
+      "par": 4,
+      "score": 6,
+      "distance": 366,
+      "strokes": [
+        {
+          "club": "7W",
+          "lie": "Tee",
+          "distanceRemaining": 365.54,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59339542262458,
+            "longitude": -116.16819141333653
+          }
+        },
+        {
+          "club": "5I",
+          "lie": "Recovery",
+          "distanceRemaining": 231.48,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.594447616076536,
+            "longitude": -116.16875748752226
+          }
+        },
+        {
+          "club": "7W",
+          "lie": "Fairway",
+          "distanceRemaining": 232.12,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59444311253684,
+            "longitude": -116.16875373354031
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 44.76,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.595967911620804,
+            "longitude": -116.16983376337942
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 5,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 5,
+          "position": {
+            "latitude": 43.59596639970503,
+            "longitude": -116.17034197570574
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 15,
+      "par": 5,
+      "score": 8,
+      "distance": 533,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 532.85,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59553977419724,
+            "longitude": -116.17059044363893
+          }
+        },
+        {
+          "club": "7I",
+          "lie": "Recovery",
+          "distanceRemaining": 267.68,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.597575165371964,
+            "longitude": -116.1716914271155
+          }
+        },
+        {
+          "club": "7I",
+          "lie": "Rough",
+          "distanceRemaining": 170.29,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59847913192188,
+            "longitude": -116.17155320146978
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 36.7,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.599428304741984,
+            "longitude": -116.1727122296961
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Fairway",
+          "distanceRemaining": 9.96,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59971789427245,
+            "longitude": -116.1724066636492
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 6.67,
+          "SGA": 0,
+          "strokeCount": 3,
+          "firstPuttDistance": 6.6667,
+          "position": {
+            "latitude": 43.59969407426951,
+            "longitude": -116.1725148423996
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 16,
+      "par": 4,
+      "score": 4,
+      "distance": 400,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 342.3,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.6003391398523,
+            "longitude": -116.17278878587872
+          }
+        },
+        {
+          "club": "LW",
+          "lie": "Rough",
+          "distanceRemaining": 48.87,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.598233790996986,
+            "longitude": -116.17110371711003
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Fairway",
+          "distanceRemaining": 17.84,
+          "SGA": 0,
+          "strokeCount": 1,
+          "position": {
+            "latitude": 43.59802757571103,
+            "longitude": -116.170490524967
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 0.33,
+          "SGA": 0,
+          "strokeCount": 1,
+          "firstPuttDistance": 0.3333,
+          "position": {
+            "latitude": 43.59797473020903,
+            "longitude": -116.17067949850941
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 17,
+      "par": 3,
+      "score": 5,
+      "distance": 169,
+      "strokes": [
+        {
+          "club": "7I",
+          "lie": "Tee",
+          "distanceRemaining": 168.89,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.597407611127565,
+            "longitude": -116.1704106723109
+          }
+        },
+        {
+          "club": "SW",
+          "lie": "Rough",
+          "distanceRemaining": 36.79,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.596232328595775,
+            "longitude": -116.16963837321758
+          }
+        },
+        {
+          "club": "LW",
+          "lie": "Sand",
+          "distanceRemaining": 21.65,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59648418739795,
+            "longitude": -116.16918077033641
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 3.67,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 3.6667,
+          "position": {
+            "latitude": 43.59631045864405,
+            "longitude": -116.16923476451645
+          }
+        }
+      ]
+    },
+    {
+      "holeNumber": 18,
+      "par": 5,
+      "score": 7,
+      "distance": 450,
+      "strokes": [
+        {
+          "club": "DR",
+          "lie": "Tee",
+          "distanceRemaining": 450.35,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59631400725422,
+            "longitude": -116.16973890542559
+          }
+        },
+        {
+          "club": "7I",
+          "lie": "Rough",
+          "distanceRemaining": 162.27,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59392308456781,
+            "longitude": -116.16824149270437
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Recovery",
+          "distanceRemaining": 113.26,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.593525537984924,
+            "longitude": -116.16780807375166
+          }
+        },
+        {
+          "club": "7I",
+          "lie": "Recovery",
+          "distanceRemaining": 87.03,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.593618742532975,
+            "longitude": -116.16748229407563
+          }
+        },
+        {
+          "club": "GW",
+          "lie": "Fairway",
+          "distanceRemaining": 66.84,
+          "SGA": 0,
+          "position": {
+            "latitude": 43.59375843549494,
+            "longitude": -116.16713849138611
+          }
+        },
+        {
+          "club": "PU",
+          "lie": "Green",
+          "distanceRemaining": 5.33,
+          "SGA": 0,
+          "strokeCount": 2,
+          "firstPuttDistance": 5.3333,
+          "position": {
+            "latitude": 43.5934312781725,
+            "longitude": -116.16652867767603
+          }
+        }
+      ]
+    }
+  ]
+}
