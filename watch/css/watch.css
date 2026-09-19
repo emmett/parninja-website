@@ -244,16 +244,20 @@ body {
   color: inherit;
 }
 
-/* Pin stack: GPS tip sits on the coordinate; pill floats above (MapLibre anchor=bottom). */
+/* Pin stack: 0×0 anchor on GPS; pill sits beside the trail via --pin-ox/oy. */
 .pin-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  width: 0;
+  height: 0;
+  position: relative;
   pointer-events: none;
   line-height: 1;
 }
 
 .pin-pill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%) translate(var(--pin-ox, 40px), var(--pin-oy, 0px));
   padding: 6px 10px;
   border-radius: 12px;
   min-width: 44px;

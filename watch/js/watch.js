@@ -385,7 +385,7 @@
 
     // Same edgePadding as app fitToCoordinates — fit the path itself, don't inflate deltas
     map.fitBounds(bounds, {
-      padding: { top: 80, right: 50, bottom: 80, left: 50 },
+      padding: { top: 90, right: 72, bottom: 90, left: 72 },
       bearing: bearing,
       pitch: 0,
       duration: 400,
@@ -393,10 +393,118 @@
     });
   }
 
-  function makePinElement(stroke, label, isCurrent, isGhost) {
+  /** Consecutive strokes closer than this (yards) share a cluster and fan out. */
+  var PIN_CLUSTER_YARDS = 28;
+  /** Clearance from GPS point to the near edge of the pill (px). */
+  var PIN_EDGE_GAP_PX = 22;
+  var PIN_CLUSTER_STEP_PX = 22;
+
+  function pathBearingAt(strokes, index) {
+    if (!strokes.length) return 0;
+    if (strokes.length === 1) return 0;
+    if (index < strokes.length - 1) {
+      return PinLabel.bearingDegrees(
+        strokes[index].position,
+        strokes[index + 1].position
+      );
+    }
+    return PinLabel.bearingDegrees(
+      strokes[index - 1].position,
+      strokes[index].position
+    );
+  }
+
+  /**
+   * Unit vectors in screen space for path direction and left-of-play lateral.
+   * Screen y grows downward; path bearing is geographic.
+   */
+  function pathScreenAxes(pathBearingDeg, mapBearingDeg) {
+    var theta = ((pathBearingDeg - mapBearingDeg) * Math.PI) / 180;
+    return {
+      pathX: Math.sin(theta),
+      pathY: -Math.cos(theta),
+      // Left of play = 90° CCW from path dir
+      latX: Math.cos(theta),
+      latY: Math.sin(theta),
+    };
+  }
+
+  /**
+   * Offset so the pill's near edge clears the GPS point by PIN_EDGE_GAP_PX
+   * along the lateral axis (pill is center-anchored via CSS on a 0×0 stack).
+   */
+  function pinOffsetForPill(axes, leftOfPlay, pillEl, extraPx, alongPx) {
+    var halfW = Math.max(pillEl.offsetWidth, 48) / 2;
+    var halfH = Math.max(pillEl.offsetHeight, 24) / 2;
+    var side = leftOfPlay ? 1 : -1;
+    var lx = axes.latX;
+    var ly = axes.latY;
+    var edge =
+      Math.abs(lx) * halfW + Math.abs(ly) * halfH + PIN_EDGE_GAP_PX + (extraPx || 0);
+    var along = alongPx || 0;
+    return [
+      side * lx * edge + axes.pathX * along,
+      side * ly * edge + axes.pathY * along,
+    ];
+  }
+
+  function setPillOffset(stackEl, ox, oy) {
+    stackEl.style.setProperty('--pin-ox', ox + 'px');
+    stackEl.style.setProperty('--pin-oy', oy + 'px');
+  }
+
+  /**
+   * Layout pills off the trail. Default: left of play. Clusters alternate
+   * sides and step outward so overlapping GPS (putts, drops) don't stack.
+   */
+  function buildPinPlans(strokes, mapBearing) {
+    var plans = [];
+    if (!strokes.length) return plans;
+
+    var clusters = [];
+    var group = [0];
+    for (var i = 1; i < strokes.length; i++) {
+      var gap = PinLabel.distanceYards(
+        strokes[i - 1].position,
+        strokes[i].position
+      );
+      if (gap != null && gap < PIN_CLUSTER_YARDS) {
+        group.push(i);
+      } else {
+        clusters.push(group);
+        group = [i];
+      }
+    }
+    clusters.push(group);
+
+    clusters.forEach(function (members) {
+      members.forEach(function (strokeIndex, rank) {
+        var bearing = pathBearingAt(strokes, strokeIndex);
+        var axes = pathScreenAxes(bearing, mapBearing);
+        var leftOfPlay = rank % 2 === 0;
+        var extra = Math.floor(rank / 2) * PIN_CLUSTER_STEP_PX;
+        var along =
+          members.length > 1
+            ? (rank % 2 === 0 ? 1 : -1) * Math.floor(rank / 2) * 10
+            : 0;
+        plans[strokeIndex] = {
+          axes: axes,
+          leftOfPlay: leftOfPlay,
+          side: leftOfPlay ? 'left' : 'right',
+          extra: extra,
+          along: along,
+          bearing: bearing,
+        };
+      });
+    });
+    return plans;
+  }
+
+  function makePinElement(stroke, label, isCurrent, isGhost, side) {
     var stack = document.createElement('div');
     stack.className =
-      'pin-stack' +
+      'pin-stack side-' +
+      (side || 'left') +
       (isCurrent ? ' current' : '') +
       (isGhost ? ' ghost' : '');
 
@@ -408,6 +516,29 @@
 
     stack.appendChild(pill);
     return stack;
+  }
+
+  function applyPinOffsets(strokes) {
+    if (!state.map || !strokes.length || !state.markers.length) return;
+    var mapBearing = state.map.getBearing();
+    var plans = buildPinPlans(strokes, mapBearing);
+    state.markers.forEach(function (marker, i) {
+      var plan = plans[i];
+      if (!plan) return;
+      var el = marker.getElement();
+      if (!el) return;
+      var pill = el.querySelector('.pin-pill') || el;
+      var offset = pinOffsetForPill(
+        plan.axes,
+        plan.leftOfPlay,
+        pill,
+        plan.extra,
+        plan.along
+      );
+      setPillOffset(el, offset[0], offset[1]);
+      el.classList.remove('side-left', 'side-right');
+      el.classList.add('side-' + plan.side);
+    });
   }
 
   function renderMapContent(opts) {
@@ -435,26 +566,55 @@
     setTrail(coords);
     setPoints(strokes, revealedCount, state.strokeCursor);
 
-    // Full hole pins: ghosts for not-yet-played, solid for revealed
+    var mapBearing = state.map ? state.map.getBearing() : 0;
+    var plans = buildPinPlans(strokes, mapBearing);
+
+    // Full hole pins: ghosts for not-yet-played, solid for revealed — beside the trail
     strokes.forEach(function (stroke, i) {
       var dist = PinLabel.shotDistanceForStroke(strokes, i);
       var label = PinLabel.getStrokePinLabel(stroke, dist);
       var isRevealed = i < revealedCount;
       var isCurrent = i === state.strokeCursor;
-      var el = makePinElement(stroke, label, isCurrent, !isRevealed);
+      var plan = plans[i] || {
+        axes: pathScreenAxes(0, mapBearing),
+        leftOfPlay: true,
+        side: 'left',
+        extra: 0,
+        along: 0,
+      };
+      var el = makePinElement(stroke, label, isCurrent, !isRevealed, plan.side);
 
+      // Anchor sits on GPS (0×0); pill is offset in CSS perpendicular to the path
       var marker = new maplibregl.Marker({
         element: el,
-        anchor: 'bottom',
-        offset: [0, -12],
+        anchor: 'center',
+        offset: [0, 0],
       })
         .setLngLat([stroke.position.longitude, stroke.position.latitude])
         .addTo(state.map);
+
+      var pill = el.querySelector('.pin-pill');
+      var offset = pinOffsetForPill(
+        plan.axes,
+        plan.leftOfPlay,
+        pill,
+        plan.extra,
+        plan.along
+      );
+      setPillOffset(el, offset[0], offset[1]);
       state.markers.push(marker);
+    });
+
+    // Re-measure after layout + after hole camera bearing settles
+    requestAnimationFrame(function () {
+      applyPinOffsets(strokes);
     });
 
     if (opts.reframeCamera) {
       frameHoleCamera(strokes, true);
+      state.map.once('moveend', function () {
+        applyPinOffsets(strokes);
+      });
     }
 
     updateShotMeta();
