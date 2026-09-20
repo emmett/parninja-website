@@ -352,6 +352,7 @@
         var penalty = 0;
         var strokeCount = null;
         var firstPuttDistance = null;
+        var lastPuttDistance = null;
 
         if (si === 0) {
           // [c] | [c, pen] at Tee; [c, lie] | [c, lie, pen] otherwise
@@ -373,11 +374,14 @@
           lie = LIE_FROM_CHAR[lieChars[lieIx]] || 'Fairway';
           var isPutt = club === 'PU' && lie === 'Green';
           if (isPutt) {
-            strokeCount = (s[2] | 0) || 1;
+            // [c, G, puttCount, firstPuttFeet] optionally + lastPuttFeet (not penalty)
+            strokeCount = Math.max(1, s[2] | 0);
             firstPuttDistance = (s[3] | 0) / 3; // feet → yards
             lat = greenLat;
             lng = greenLng;
-            if (s.length > 4) penalty = s[4] | 0;
+            if (strokeCount > 1 && s.length > 4 && (s[4] | 0) > 0) {
+              lastPuttDistance = (s[4] | 0) / 3;
+            }
           } else {
             lat = prevLat + fromE5(s[2] | 0);
             lng = prevLng + fromE5(s[3] | 0);
@@ -392,6 +396,7 @@
         };
         if (strokeCount != null) stroke.strokeCount = strokeCount;
         if (firstPuttDistance != null) stroke.firstPuttDistance = firstPuttDistance;
+        if (lastPuttDistance != null) stroke.lastPuttDistance = lastPuttDistance;
         if (penalty) stroke.penalty = penalty;
 
         var add = strokeCount != null ? strokeCount : 1;
