@@ -443,7 +443,6 @@
         state.mapAdapter.clearHoleOverlays();
       }
       state.lastHoleNumber = holeNumber;
-      state.cameraMode = null;
       frameHoleCamera(holeNumber, true);
       renderScorecard();
     }
@@ -640,7 +639,6 @@
     state.controller = ReplayEngine.createReplayController(state.timeline);
     syncFromController();
     state.cameraHoleNumber = null;
-    state.cameraMode = null;
     state.lastHoleNumber = null;
 
     var meta = normalized.meta || {};
