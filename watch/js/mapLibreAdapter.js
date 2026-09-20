@@ -49,6 +49,7 @@
     hooks = hooks || {};
     return {
       fitRegion: function (region, opts) {
+        opts = opts || {};
         var halfLat = region.latitudeDelta / 2;
         var halfLng = region.longitudeDelta / 2;
         var bounds = new maplibregl.LngLatBounds(
@@ -56,11 +57,11 @@
           [region.longitude + halfLng, region.latitude + halfLat]
         );
         map.fitBounds(bounds, {
-          padding: 0,
+          padding: opts.padding || 0,
           bearing: 0,
           pitch: 0,
-          duration: opts && opts.animated === false ? 0 : 400,
-          maxZoom: 18.5,
+          duration: opts.animated === false ? 0 : 400,
+          maxZoom: opts.maxZoom != null ? opts.maxZoom : 18.5,
         });
       },
       setPathSegments: function (segments, style) {

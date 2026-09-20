@@ -10,20 +10,22 @@
     outline: { color: 'rgba(255,255,255,0.94)', width: 9 },
     main: { color: '#14532d', width: 5 },
   };
-  var LANDSCAPE = (ReplayEngine.STYLIZED_LANDSCAPE && ReplayEngine.STYLIZED_LANDSCAPE.landscape) || '#cfe8b8';
+  var ESRI_SAT =
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
-  /* Landscape greens from shared tokens (no roads/POIs/satellite). */
-  var STYLIZED_STYLE = {
+  var SATELLITE_STYLE = {
     version: 8,
-    name: 'parninja-stylized',
-    sources: {},
-    layers: [
-      {
-        id: 'background',
-        type: 'background',
-        paint: { 'background-color': LANDSCAPE },
+    name: 'parninja-satellite',
+    sources: {
+      esri: {
+        type: 'raster',
+        tiles: [ESRI_SAT],
+        tileSize: 256,
+        attribution: 'Tiles © Esri',
+        maxzoom: 19,
       },
-    ],
+    },
+    layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
   };
 
   var state = {
@@ -277,6 +279,11 @@
       state.puttMarker.remove();
       state.puttMarker = null;
     }
+    var puttEl = $('putt-overlay');
+    if (puttEl) {
+      puttEl.innerHTML = '';
+      puttEl.classList.add('hidden');
+    }
   }
 
   function setTrailSegments(segments) {
@@ -386,6 +393,20 @@
     return wrap;
   }
 
+  function mapChromePadding(extraTop) {
+    var wrap = document.querySelector('.watch-map-wrap');
+    var h = wrap ? wrap.clientHeight : 600;
+    var w = wrap ? wrap.clientWidth : 400;
+    var inset = ReplayEngine.MAP_VIEWPORT_SAFE_INSET || 0.18;
+    return {
+      top: Math.max(extraTop || 24, Math.round(h * inset * 0.5)),
+      bottom: Math.max(150, Math.round(h * inset) + 80),
+      left: Math.max(28, Math.round(w * inset * 0.5)),
+      right: Math.max(28, Math.round(w * inset * 0.5)),
+    };
+  }
+
+  /** Hole frame: tee + green + swing GPS with shared safe-inset region. */
   function frameHoleCamera(holeNumber, force) {
     if (!state.mapAdapter || !state.timeline) return;
     if (!force && state.cameraHoleNumber === holeNumber) return;
@@ -394,7 +415,20 @@
     var hole = holeByNumber(holeNumber);
     var region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
     if (!region) return;
-    state.mapAdapter.fitRegion(region, { animated: true });
+    // App animateToRegion(region) only — region already includes MAP_VIEWPORT_SAFE_INSET.
+    // Extra chrome padding accounts for web scorecard/transport overlays.
+    state.mapAdapter.fitRegion(region, {
+      animated: true,
+      padding: mapChromePadding(24),
+    });
+  }
+
+  function showPuttOverlay(tracker) {
+    var el = $('putt-overlay');
+    if (!el) return;
+    el.innerHTML = '';
+    el.appendChild(buildPuttTrackerEl(tracker));
+    el.classList.remove('hidden');
   }
 
   function renderFrame() {
@@ -409,6 +443,7 @@
         state.mapAdapter.clearHoleOverlays();
       }
       state.lastHoleNumber = holeNumber;
+      state.cameraMode = null;
       frameHoleCamera(holeNumber, true);
       renderScorecard();
     }
@@ -475,21 +510,9 @@
         .addTo(state.map);
     }
 
+    // Match app: keep hole framing during putts; putt chrome is a screen overlay.
     if (frame.pathKind === 'putt' && frame.puttTracker) {
-      var hole = holeByNumber(holeNumber);
-      var green =
-        (hole && hole.greenPosition) ||
-        frame.position;
-      if (green) {
-        var puttEl = buildPuttTrackerEl(frame.puttTracker);
-        state.puttMarker = new maplibregl.Marker({
-          element: puttEl,
-          anchor: 'bottom',
-          offset: [0, -12],
-        })
-          .setLngLat([green.longitude, green.latitude])
-          .addTo(state.map);
-      }
+      showPuttOverlay(frame.puttTracker);
     }
   }
 
@@ -593,10 +616,10 @@
   function initMap(cb) {
     var map = new maplibregl.Map({
       container: 'watch-map',
-      style: STYLIZED_STYLE,
+      style: SATELLITE_STYLE,
       center: [-116.1648, 43.5912],
       zoom: 15.5,
-      attributionControl: false,
+      attributionControl: true,
     });
     state.map = map;
     state.mapAdapter = MapLibreReplayAdapter.create(map, {
@@ -617,6 +640,7 @@
     state.controller = ReplayEngine.createReplayController(state.timeline);
     syncFromController();
     state.cameraHoleNumber = null;
+    state.cameraMode = null;
     state.lastHoleNumber = null;
 
     var meta = normalized.meta || {};
