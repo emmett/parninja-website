@@ -1,16 +1,15 @@
 :root {
-  --green-900: #1b3d1f;
-  --green-800: #2e5c32;
-  --green-700: #388e3c;
-  --green-600: #43a047;
-  --green-100: #e8f5e9;
+  --forest: #14532d;
+  --green-active: #2e7d32;
+  --green-chip: #e8f5e9;
+  --birdie: #2e7d32;
+  --bogey: #c62828;
+  --par-text: #333;
+  --score-idle: #f3f4f6;
   --text: #1a2e1c;
-  --text-muted: #4a6350;
+  --text-muted: #6b7280;
   --white: #ffffff;
-  --scorecard-bg: #1b3d1f;
-  --scorecard-cell: #243f28;
-  --scorecard-active: #388e3c;
-  --transport-h: 4.25rem;
+  --map-land: #cfe8b8;
 }
 
 *,
@@ -26,7 +25,7 @@ body {
   overflow: hidden;
   font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
-  background: var(--green-900);
+  background: var(--white);
 }
 
 .watch-app {
@@ -34,186 +33,233 @@ body {
   flex-direction: column;
   height: 100%;
   height: 100dvh;
+  background: var(--white);
 }
 
-/* —— Brand strip —— */
 .watch-top {
   flex-shrink: 0;
   background: var(--white);
-  border-bottom: 1px solid rgba(27, 61, 31, 0.1);
-  z-index: 3;
+  border-bottom: none;
+  z-index: 4;
 }
 
 .watch-brand {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.65rem 1rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem 0.35rem;
 }
 
 .brand-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   text-decoration: none;
-  color: var(--green-800);
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .brand-link img {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  border-radius: 6px;
 }
 
 .watch-meta {
   flex: 1;
   min-width: 0;
-  text-align: right;
+  text-align: center;
 }
 
 .watch-meta .course {
   margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--green-900);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .watch-meta .sub {
-  margin: 0;
+  margin: 0.1rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 500;
+  color: #6b7280;
 }
 
-/* —— Scorecard —— */
+.watch-meta .meta-duration[hidden] {
+  display: none;
+}
+
+.speed-chip {
+  flex-shrink: 0;
+  border: none;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0.4rem 0.75rem;
+  border-radius: 14px;
+  cursor: pointer;
+  min-width: 44px;
+}
+
+.speed-chip:hover {
+  filter: brightness(0.97);
+}
+
 .scorecard-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  background: var(--scorecard-bg);
-  scrollbar-width: thin;
+  padding: 0.35rem 0.65rem 0.55rem;
+  scrollbar-width: none;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.scorecard-wrap::-webkit-scrollbar {
+  display: none;
 }
 
 .scorecard {
-  display: grid;
-  grid-template-rows: auto auto auto;
+  display: flex;
+  gap: 0.3rem;
   width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  color: var(--white);
-}
-
-.scorecard-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 2.5rem;
-}
-
-.scorecard-row.labels {
-  grid-auto-columns: 3.25rem 2.5rem;
+  margin: 0 auto;
 }
 
 .scorecard-cell {
+  width: 36px;
+  flex-shrink: 0;
+  border: none;
+  background: var(--score-idle);
+  border-radius: 8px;
+  padding: 0.3rem 0.15rem;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+}
+
+.scorecard-cell:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.scorecard-cell.active {
+  background: var(--forest);
+  color: #fff;
+}
+
+.scorecard-cell .hole-num {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.1;
+}
+
+.scorecard-cell.active .hole-num {
+  opacity: 0.9;
+  color: #fff;
+}
+
+.scorecard-cell .score-val {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.75rem;
-  padding: 0.2rem 0.15rem;
-  background: var(--scorecard-cell);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.scorecard-cell.label {
-  justify-content: flex-start;
-  padding-left: 0.5rem;
-  font-weight: 600;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.65);
-  background: #152e18;
-}
-
-.scorecard-cell.hole-num {
+  min-height: 1.35rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  background: #234a28;
-  cursor: pointer;
-  user-select: none;
+  line-height: 1;
 }
 
-.scorecard-cell.hole-num:hover,
-.scorecard-cell.hole-num:focus-visible {
-  background: #2e5c32;
-  outline: none;
+.scorecard-cell .score-val.birdie {
+  color: var(--birdie);
 }
 
-.scorecard-cell.hole-num.active,
-.scorecard-cell.par.active,
-.scorecard-cell.score.active {
-  background: var(--scorecard-active);
+.scorecard-cell .score-val.bogey {
+  color: var(--bogey);
 }
 
-.scorecard-cell.total {
-  font-weight: 700;
-  background: #152e18;
-  min-width: 3rem;
+.scorecard-cell.active .score-val {
+  color: #fff;
 }
 
 .score-shape {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.35rem;
-  height: 1.35rem;
-  font-weight: 700;
-  font-size: 0.8rem;
-  line-height: 1;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 2px;
 }
 
-.score-shape.birdie {
+.score-shape.circle {
   border: 1.5px solid currentColor;
   border-radius: 50%;
 }
 
-.score-shape.eagle {
-  box-shadow: 0 0 0 1.5px currentColor;
+.score-shape.square {
   border: 1.5px solid currentColor;
-  border-radius: 50%;
 }
 
-.score-shape.bogey {
+.score-shape.double-square {
   border: 1.5px solid currentColor;
-  border-radius: 2px;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  padding: 0 3px;
 }
 
-.score-shape.double {
-  box-shadow: 0 0 0 1.5px currentColor;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-}
-
-/* —— Map —— */
 .watch-map-wrap {
-  position: relative;
   flex: 1;
+  position: relative;
   min-height: 0;
+  background: var(--map-land);
 }
 
 #watch-map {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.yards-panel {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.97);
+  padding: 6px 14px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(15, 23, 42, 0.35);
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.yards-panel.hidden {
+  display: none;
+}
+
+.yards-value {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 30px;
+}
+
+.yards-unit {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
 }
 
 .map-empty {
@@ -222,11 +268,12 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--map-land);
+  z-index: 1;
   text-align: center;
-  color: var(--white);
-  background: rgba(27, 61, 31, 0.92);
-  z-index: 2;
+  padding: 1.5rem;
 }
 
 .map-empty.visible {
@@ -235,16 +282,148 @@ body {
 
 .map-empty p {
   margin: 0;
-  max-width: 16rem;
-  font-size: 0.95rem;
-  line-height: 1.45;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: #1f2937;
 }
 
-.maplibregl-ctrl-attrib a {
-  color: inherit;
+.map-empty-sub {
+  font-weight: 500 !important;
+  color: #6b7280 !important;
+  font-size: 0.875rem !important;
 }
 
-/* Pin stack: 0×0 anchor on GPS; pill sits beside the trail via --pin-ox/oy. */
+/* Match app mapControlsOverlay */
+.map-controls-overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.map-controls-overlay > * {
+  pointer-events: auto;
+}
+
+.stroke-scrubber {
+  align-self: center;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 16px;
+  padding: 6px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.scrubber-label {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.scrubber-ticks {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.scrubber-tick {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 13px;
+  background: #f3f4f6;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scrubber-tick.active {
+  background: #14532d;
+  color: #fff;
+}
+
+.scrubber-tick:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.playback-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  width: min(100%, 320px);
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 28px;
+  padding: 4px 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+.skip-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 20px;
+  background: #e8f5e9;
+  color: #14532d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.skip-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.play-btn {
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 26px;
+  background: #2e7d32;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.play-btn .icon-pause[hidden],
+.play-btn .icon-play[hidden] {
+  display: none;
+}
+
+.cta-app {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2e7d32;
+  text-decoration: none;
+  padding: 4px 8px;
+  background: transparent;
+  border-radius: 8px;
+}
+
+.cta-app:hover {
+  text-decoration: underline;
+}
+
+/* Pin: GPS dot at coordinate; pill offset via CSS vars (match MapStrokePin) */
 .pin-stack {
   width: 0;
   height: 0;
@@ -253,11 +432,32 @@ body {
   line-height: 1;
 }
 
+.pin-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #111;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.pin-stack.selected .pin-dot {
+  background: #ffebee;
+  border-color: #c62828;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+}
+
 .pin-pill {
   position: absolute;
   left: 0;
   top: 0;
-  transform: translate(-50%, -50%) translate(var(--pin-ox, 40px), var(--pin-oy, 0px));
+  transform: translate(-50%, -50%) translate(var(--pin-ox, 0px), var(--pin-oy, -34px));
   padding: 6px 10px;
   border-radius: 12px;
   min-width: 44px;
@@ -276,186 +476,183 @@ body {
   text-shadow: none;
 }
 
-.pin-pill.current {
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.95),
-    0 0 0 5px rgba(27, 61, 31, 0.85),
-    0 2px 6px rgba(0, 0, 0, 0.4);
+.pin-pill.selected {
+  background: #c62828 !important;
 }
 
-.pin-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 3px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid #1b5e20;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-}
-
-.pin-stack.current .pin-dot {
-  background: #c62828;
-  border-color: #fff;
+.ball-marker {
   width: 12px;
   height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #111;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
 }
 
-.pin-stack.ghost {
-  opacity: 0.4;
+/* Putt distance tracker overlay */
+.putt-tracker {
+  min-width: 240px;
+  max-width: 320px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  pointer-events: none;
 }
 
-.pin-stack.ghost .pin-pill {
-  filter: grayscale(0.2);
+.putt-tracker-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
-/* —— Transport —— */
-.watch-transport {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: var(--transport-h);
-  padding: 0.65rem 1rem calc(0.65rem + env(safe-area-inset-bottom));
-  background: var(--white);
-  border-top: 1px solid rgba(27, 61, 31, 0.1);
-  z-index: 3;
-}
-
-.scan-group {
+.putt-tracker-result {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
-.scan-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  padding: 0;
-  border: 1px solid rgba(27, 61, 31, 0.18);
-  border-radius: 999px;
-  background: var(--white);
-  color: var(--green-800);
-  font-size: 1.1rem;
-  cursor: pointer;
+.putt-tracker-result .count {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--forest);
   line-height: 1;
 }
 
-.scan-btn:hover:not(:disabled),
-.scan-btn:focus-visible {
-  background: var(--green-100);
-  outline: none;
-}
-
-.scan-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.scan-btn.hole,
-.scan-btn.speed {
-  font-size: 0.7rem;
+.putt-tracker-result .label {
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  width: auto;
-  padding: 0 0.65rem;
-  border-radius: 999px;
+  color: #374151;
 }
 
-.scan-btn.play {
-  background: var(--green-700);
-  border-color: var(--green-700);
-  color: var(--white);
-  font-size: 0.8rem;
+.putt-track-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.putt-flag {
+  width: 18px;
+  height: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.putt-flag-pole {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  width: 2px;
+  height: 22px;
+  background: #111;
+  border-radius: 1px;
+}
+
+.putt-flag-cloth {
+  position: absolute;
+  left: 6px;
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 11px solid #c62828;
+}
+
+.putt-flag-cup {
+  position: absolute;
+  left: 1px;
+  bottom: 0;
+  width: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: #111;
+}
+
+.putt-track {
+  flex: 1;
+  height: 48px;
+  position: relative;
+}
+
+.putt-track-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: #e5e7eb;
+}
+
+.putt-frame {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  margin-left: -18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.putt-frame-box {
+  min-width: 28px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1.5px solid var(--forest);
+  background: #fff;
+  font-size: 10px;
   font-weight: 700;
-  width: auto;
-  min-width: 4.5rem;
-  padding: 0 0.85rem;
-  border-radius: 999px;
-  letter-spacing: 0.02em;
+  color: var(--forest);
 }
 
-.scan-btn.play:hover:not(:disabled),
-.scan-btn.play:focus-visible {
-  background: var(--green-800);
-  border-color: var(--green-800);
+.putt-frame-point {
+  position: absolute;
+  top: 19px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--forest);
+  border: 2px solid #fff;
 }
 
-.scan-btn.play.is-playing {
-  background: var(--green-900);
-  border-color: var(--green-900);
+.putt-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  top: 18px;
+  border-radius: 6px;
+  background: var(--forest);
+  border: 2px solid #fff;
 }
 
-.shot-meta {
-  min-width: 0;
+.putt-scale-end {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  width: 28px;
+  flex-shrink: 0;
   text-align: center;
 }
 
-.shot-meta .primary {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--green-900);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.shot-meta .secondary {
-  margin: 0.1rem 0 0;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cta-app {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.55rem 0.85rem;
-  border-radius: 999px;
-  background: var(--green-700);
-  color: var(--white);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.cta-app:hover {
-  background: var(--green-800);
-}
-
-.cta-app.hidden {
-  display: none;
-}
-
 @media (max-width: 520px) {
-  .watch-transport {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto;
-    gap: 0.5rem;
+  .watch-meta .course {
+    font-size: 0.9rem;
   }
 
-  .scan-group {
-    justify-content: center;
-  }
-
-  .cta-app {
-    justify-self: center;
-  }
-
-  .watch-brand {
-    flex-wrap: wrap;
-  }
-
-  .watch-meta {
-    flex-basis: 100%;
-    text-align: left;
+  .playback-row {
+    width: 100%;
   }
 }

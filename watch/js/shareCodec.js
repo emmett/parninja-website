@@ -30,9 +30,18 @@
   var CLUB_IX = '0123456789abcdefghijklmnopqrstuvwxyz';
 
   function b64UrlDecode(str) {
-    var s = str.replace(/-/g, '+').replace(/_/g, '/');
+    if (!str || typeof str !== 'string') {
+      throw new Error('Empty share blob');
+    }
+    // Strip whitespace/newlines messengers sometimes insert.
+    var s = str.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
     while (s.length % 4) s += '=';
-    var bin = atob(s);
+    var bin;
+    try {
+      bin = atob(s);
+    } catch (e) {
+      throw new Error('Share link looks truncated or corrupted');
+    }
     var out = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
@@ -432,43 +441,64 @@
 
   /**
    * Decode a #r= blob (base64url, optionally gzip or raw-DEFLATE).
+   * Always returns a Promise — never throws synchronously (so UI catch runs).
    * @returns {Promise<object>} watch round doc
    */
   function decodeShareBlob(blob) {
-    var compressed = b64UrlDecode(blob);
+    return Promise.resolve().then(function () {
+      var compressed = b64UrlDecode(blob);
 
-    function tryPlain() {
-      return Promise.resolve(parsePayloadBytes(compressed));
-    }
-
-    function afterInflate(raw) {
-      try {
-        return parseDecompressed(raw);
-      } catch (e) {
-        return null;
+      function tryPlain() {
+        return parsePayloadBytes(compressed);
       }
-    }
 
-    // Prefer gzip (v2 pack pipeline), then raw DEFLATE (compact encodings), then plain.
-    return inflateGzip(compressed)
-      .then(function (raw) {
-        var doc = afterInflate(raw);
-        if (doc) return doc;
-        return inflateRaw(compressed).then(function (raw2) {
-          var doc2 = afterInflate(raw2);
-          return doc2 || tryPlain();
-        });
-      })
-      .catch(function () {
-        return inflateRaw(compressed)
-          .then(function (raw) {
-            var doc = afterInflate(raw);
-            return doc || tryPlain();
-          })
-          .catch(function () {
-            return tryPlain();
+      function afterInflate(raw) {
+        try {
+          return parseDecompressed(raw);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function fail() {
+        throw new Error('Could not decode share blob');
+      }
+
+      // Prefer gzip (v2 pack pipeline), then raw DEFLATE (compact encodings), then plain.
+      return inflateGzip(compressed)
+        .then(function (raw) {
+          var doc = afterInflate(raw);
+          if (doc) return doc;
+          return inflateRaw(compressed).then(function (raw2) {
+            var doc2 = afterInflate(raw2);
+            if (doc2) return doc2;
+            try {
+              return tryPlain();
+            } catch (e) {
+              return fail();
+            }
           });
-      });
+        })
+        .catch(function () {
+          return inflateRaw(compressed)
+            .then(function (raw) {
+              var doc = afterInflate(raw);
+              if (doc) return doc;
+              try {
+                return tryPlain();
+              } catch (e) {
+                return fail();
+              }
+            })
+            .catch(function () {
+              try {
+                return tryPlain();
+              } catch (e) {
+                return fail();
+              }
+            });
+        });
+    });
   }
 
   /**
@@ -484,7 +514,14 @@
       // support #r=...&other by cutting at &
       var amp = blob.indexOf('&');
       if (amp !== -1) blob = blob.slice(0, amp);
-      return decodeShareBlob(decodeURIComponent(blob));
+      var decoded = blob;
+      try {
+        decoded = decodeURIComponent(blob);
+      } catch (e) {
+        // Keep raw blob if messengers mangled % sequences.
+        decoded = blob;
+      }
+      return decodeShareBlob(decoded);
     }
 
     var params = new URLSearchParams(location.search);

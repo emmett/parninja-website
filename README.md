@@ -10,7 +10,7 @@ Hosted on **GitHub Pages** (separate from the [parninja](https://github.com/emme
 - `/privacy` — privacy policy and contact form
 - `/data` — data access, correction, and deletion requests
 - `/support` — support contact form
-- `/watch` — shared hole scanner (scorecard + map tracers). Noindexed via meta robots and `robots.txt`.
+- `/watch` — shared round replay (TF 192 screen-player: scorecard + stylized map tracers). Noindexed via meta robots and `robots.txt`.
 
 ## Watch page — payload handoff (testing today)
 
@@ -90,6 +90,10 @@ Production (after deploy): `https://parninja.com/watch/` and `https://parninja.c
 ### Live share decode
 
 `#r=` blobs are decoded client-side by `watch/js/shareCodec.js` (gzip or raw DEFLATE → JSON / compact → boot).
+
+The player matches the in-app **TF 192 screen-player contract** via shared **`@parninja/replay`** (engine + controller + tokens), with chrome/transport/yards/pins aligned to `RoundReplayPlayer`. Source of truth: `parninja/packages/replay`. `/watch` loads a generated IIFE (`watch/js/replayEngine.js`) — rebuild with `scripts/build-replay-engine.sh` or from the app: `npm run build:watch-replay`. Encode stays parked.
+
+**Intentional diffs vs native:** MapLibre flat greens (no Apple/Google muted basemap detail); web CTA link instead of in-app share sheet; no modal close chrome.
 
 **Canonical app format = v2 pack** (below). Verbose fixtures remain for local/`?fixture=` testing only.
 

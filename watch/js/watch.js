@@ -1,851 +1,695 @@
 /**
- * ParNinja /watch — Masters-style hole scanner (scorecard + map tracers).
- * Scan manually or Play to auto-advance strokes through the round.
+ * /watch player — MapLibre shell over @parninja/replay (TF 192).
+ * Engine/controller: watch/js/replayEngine.js (generated from app packages/replay).
  */
 (function () {
   'use strict';
 
-  var TRAIL_SOURCE = 'hole-trail';
-  var TRAIL_LAYER = 'hole-trail-line';
-  var TRAIL_OUTLINE = 'hole-trail-outline';
-  var POINTS_SOURCE = 'hole-points';
-  var POINTS_LAYER = 'hole-points-circle';
-  var MS_PER_STROKE = 1600;
-  var ESRI_SAT =
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  var FRAME_MS = ReplayEngine.FRAME_MS || 33;
+  var PATH = ReplayEngine.HOLE_PATH_POLYLINE || {
+    outline: { color: 'rgba(255,255,255,0.94)', width: 9 },
+    main: { color: '#14532d', width: 5 },
+  };
+  var LANDSCAPE = (ReplayEngine.STYLIZED_LANDSCAPE && ReplayEngine.STYLIZED_LANDSCAPE.landscape) || '#cfe8b8';
+
+  /* Landscape greens from shared tokens (no roads/POIs/satellite). */
+  var STYLIZED_STYLE = {
+    version: 8,
+    name: 'parninja-stylized',
+    sources: {},
+    layers: [
+      {
+        id: 'background',
+        type: 'background',
+        paint: { 'background-color': LANDSCAPE },
+      },
+    ],
+  };
 
   var state = {
     round: null,
-    holeIndex: 0,
-    /** Index of the last revealed GPS stroke (inclusive). -1 = none yet. */
-    strokeCursor: -1,
+    timeline: null,
+    controller: null,
     map: null,
-    markers: [],
-    playing: false,
-    speed: 1,
+    mapAdapter: null,
     playTimer: null,
-    /** Hole index the camera was last framed for — reframe only on hole change (app behavior). */
-    cameraHoleIndex: -1,
+    cameraHoleNumber: null,
+    markers: [],
+    ballMarker: null,
+    puttMarker: null,
+    lastHoleNumber: null,
   };
+
+  function ctrlState() {
+    return state.controller ? state.controller.getState() : null;
+  }
+
+  function syncFromController() {
+    var s = ctrlState();
+    if (!s) return;
+    // Keep aliases used by older helpers during render.
+    state.currentTime = s.currentTime;
+    state.playing = s.playing;
+    state.speed = s.speed;
+    state.timeline = s.timeline;
+  }
 
   function $(id) {
     return document.getElementById(id);
   }
 
-  function gpsStrokes(hole) {
-    if (!hole || !hole.strokes) return [];
-    return hole.strokes.filter(function (s) {
-      return s.position && s.position.latitude != null && s.position.longitude != null;
+  function formatDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + (iso.length === 10 ? 'T12:00:00' : ''));
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     });
   }
 
-  function scoreToPar(score, par) {
-    if (score == null || par == null) return null;
-    return score - par;
-  }
-
-  function scoreShapeClass(diff) {
-    if (diff == null) return '';
-    if (diff <= -2) return 'eagle';
-    if (diff === -1) return 'birdie';
-    if (diff === 1) return 'bogey';
-    if (diff >= 2) return 'double';
+  function scoreShapeClass(score, par) {
+    if (score == null || par == null) return '';
+    var diff = score - par;
+    if (diff <= -2) return 'circle';
+    if (diff === -1) return 'circle';
+    if (diff === 1) return 'square';
+    if (diff >= 2) return 'double-square';
     return '';
   }
 
-  function formatDate(iso) {
-    if (!iso) return '';
-    var d = new Date(iso + 'T12:00:00');
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  function scoreTone(score, par) {
+    if (score == null || par == null) return '';
+    var diff = score - par;
+    if (diff < 0) return 'birdie';
+    if (diff > 0) return 'bogey';
+    return '';
   }
 
-  function formatSg(sg) {
-    if (typeof sg !== 'number' || !Number.isFinite(sg)) return null;
-    var sign = sg > 0 ? '+' : '';
-    return sign + sg.toFixed(2) + ' SG';
+  function holeByNumber(n) {
+    if (!state.round) return null;
+    return (
+      state.round.holes.find(function (h) {
+        return h.holeNumber === n;
+      }) || null
+    );
   }
 
-  function roundTotal(holes) {
-    return holes.reduce(function (sum, h) {
-      return sum + (h.score != null ? h.score : 0);
-    }, 0);
+  function currentHoleSeg() {
+    syncFromController();
+    if (!state.timeline) return null;
+    return ReplayEngine.getHoleAtTime(state.timeline, state.currentTime);
   }
 
-  function currentHole() {
-    return state.round && state.round.holes[state.holeIndex];
+  function holeStrokeTimes() {
+    var seg = currentHoleSeg();
+    if (!seg || !state.timeline) return [];
+    return ReplayEngine.getHoleStrokeStartTimes(state.timeline, seg.holeNumber);
   }
 
-  /* —— Scorecard —— */
+  function pausePlayback() {
+    if (state.controller) state.controller.setPlaying(false);
+    syncFromController();
+    clearPlayTimer();
+    updateButtons();
+  }
+
+  function clearPlayTimer() {
+    if (state.playTimer) {
+      clearInterval(state.playTimer);
+      state.playTimer = null;
+    }
+  }
+
+  function seekTo(ms, opts) {
+    opts = opts || {};
+    if (!state.controller) return;
+    state.controller.seekTo(ms, { pause: !!opts.pause });
+    syncFromController();
+    if (opts.pause) clearPlayTimer();
+    renderFrame();
+  }
 
   function renderScorecard() {
-    var root = $('scorecard');
-    var holes = state.round.holes;
-    var html = '';
-
-    html += '<div class="scorecard-row labels" role="row">';
-    html += '<div class="scorecard-cell label">Hole</div>';
-    holes.forEach(function (h, i) {
-      var active = i === state.holeIndex ? ' active' : '';
-      html +=
-        '<button type="button" class="scorecard-cell hole-num' +
-        active +
-        '" data-hole-index="' +
-        i +
-        '" aria-pressed="' +
-        (i === state.holeIndex) +
-        '">' +
-        h.holeNumber +
-        '</button>';
-    });
-    html += '<div class="scorecard-cell total">Tot</div>';
-    html += '</div>';
-
-    html += '<div class="scorecard-row labels" role="row">';
-    html += '<div class="scorecard-cell label">Par</div>';
-    holes.forEach(function (h, i) {
-      var active = i === state.holeIndex ? ' active' : '';
-      html +=
-        '<div class="scorecard-cell par' + active + '">' + (h.par != null ? h.par : '—') + '</div>';
-    });
-    html +=
-      '<div class="scorecard-cell total">' +
-      holes.reduce(function (s, h) {
-        return s + (h.par || 0);
-      }, 0) +
-      '</div>';
-    html += '</div>';
-
-    html += '<div class="scorecard-row labels" role="row">';
-    html += '<div class="scorecard-cell label">Score</div>';
-    holes.forEach(function (h, i) {
-      var active = i === state.holeIndex ? ' active' : '';
-      var diff = scoreToPar(h.score, h.par);
-      var shape = scoreShapeClass(diff);
-      var inner =
-        h.score == null
-          ? '—'
-          : shape
-            ? '<span class="score-shape ' + shape + '">' + h.score + '</span>'
-            : String(h.score);
-      html += '<div class="scorecard-cell score' + active + '">' + inner + '</div>';
-    });
-    html += '<div class="scorecard-cell total">' + roundTotal(holes) + '</div>';
-    html += '</div>';
-
-    root.innerHTML = html;
-
-    root.querySelectorAll('[data-hole-index]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        pausePlayback();
-        selectHole(Number(btn.getAttribute('data-hole-index')), true);
+    var el = $('scorecard');
+    el.innerHTML = '';
+    if (!state.round) return;
+    var seg = currentHoleSeg();
+    var activeHole = seg ? seg.holeNumber : null;
+    var playable = {};
+    if (state.timeline) {
+      state.timeline.holes.forEach(function (h) {
+        playable[h.holeNumber] = true;
       });
+    }
+
+    state.round.holes.forEach(function (hole, index) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'scorecard-cell';
+      if (hole.holeNumber === activeHole) btn.classList.add('active');
+      btn.disabled = !playable[hole.holeNumber];
+      btn.setAttribute('data-hole', String(hole.holeNumber));
+
+      var num = document.createElement('span');
+      num.className = 'hole-num';
+      num.textContent = String(hole.holeNumber);
+
+      var val = document.createElement('span');
+      val.className = 'score-val ' + scoreTone(hole.score, hole.par);
+      var shape = scoreShapeClass(hole.score, hole.par);
+      if (hole.score != null && shape) {
+        var wrap = document.createElement('span');
+        wrap.className = 'score-shape ' + shape;
+        wrap.textContent = String(hole.score);
+        val.appendChild(wrap);
+      } else {
+        val.textContent = hole.score != null ? String(hole.score) : '—';
+      }
+
+      btn.appendChild(num);
+      btn.appendChild(val);
+      btn.addEventListener('click', function () {
+        if (!state.timeline) return;
+        var target = state.timeline.holes.find(function (h) {
+          return h.holeNumber === hole.holeNumber;
+        });
+        if (!target) return;
+        seekTo(target.startMs, { pause: true });
+      });
+      el.appendChild(btn);
+
+      if (hole.holeNumber === activeHole) {
+        btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
     });
   }
 
-  /* —— Meta / transport —— */
-
-  function updateMeta() {
-    var meta = state.round.meta || {};
-    var cfg = window.SITE_CONFIG || {};
-    $('brand-name').textContent = cfg.siteName || 'ParNinja';
-    $('meta-course').textContent = meta.course || 'Shared round';
-    var parts = [];
-    if (meta.tees) parts.push(meta.tees + ' tees');
-    if (meta.datePlayed) parts.push(formatDate(meta.datePlayed));
-    if (meta.playerDisplayName) parts.push(meta.playerDisplayName);
-    $('meta-sub').textContent = parts.join(' · ');
-
-    var app = (cfg.apps && cfg.apps[0]) || {};
-    var cta = $('cta-app');
-    if (app.iosUrl) {
-      cta.href = app.iosUrl;
-      cta.classList.remove('hidden');
-    } else if (app.androidUrl) {
-      cta.href = app.androidUrl;
-      cta.classList.remove('hidden');
+  function updateHeader() {
+    syncFromController();
+    var vm = state.controller
+      ? state.controller.getFrameViewModel(state.round)
+      : null;
+    var seg = vm && vm.holeSegment;
+    var hole = seg ? holeByNumber(seg.holeNumber) : null;
+    if (seg) {
+      var score = hole && hole.score != null ? hole.score : seg.score;
+      $('meta-hole').textContent =
+        'Hole ' + seg.holeNumber + ' · Par ' + seg.par + ' · ' + score;
     } else {
-      cta.href = '../';
-    }
-  }
-
-  function updateShotMeta() {
-    var hole = currentHole();
-    var strokes = gpsStrokes(hole);
-    var primary = $('shot-primary');
-    var secondary = $('shot-secondary');
-
-    if (!hole) {
-      primary.textContent = '—';
-      secondary.textContent = '';
-      return;
+      $('meta-hole').textContent = '—';
     }
 
-    var holeLine =
-      'Hole ' +
-      hole.holeNumber +
-      ' · Par ' +
-      hole.par +
-      (hole.distance ? ' · ' + hole.distance + ' yds' : '');
+    var scrubber = (vm && vm.scrubber) || {
+      label: '—',
+      strokeTimes: [],
+      activeStrokeIndex: -1,
+    };
+    $('scrubber-label').textContent = scrubber.label;
 
-    if (strokes.length === 0) {
-      primary.textContent = holeLine;
-      secondary.textContent =
-        hole.score != null ? 'Score ' + hole.score + ' · No GPS' : 'No GPS strokes';
-      return;
+    var ticks = $('scrubber-ticks');
+    ticks.innerHTML = '';
+    scrubber.strokeTimes.forEach(function (t, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className =
+        'scrubber-tick' + (i === scrubber.activeStrokeIndex ? ' active' : '');
+      b.textContent = String(i + 1);
+      b.setAttribute('aria-label', 'Shot ' + (i + 1));
+      b.setAttribute(
+        'aria-pressed',
+        i === scrubber.activeStrokeIndex ? 'true' : 'false'
+      );
+      b.addEventListener('click', function () {
+        seekTo(t, { pause: true });
+      });
+      ticks.appendChild(b);
+    });
+
+    var chip = $('yards-chip');
+    var yardsVal = $('yards-value');
+    if (vm && vm.yardsRemaining != null) {
+      yardsVal.textContent = String(Math.round(vm.yardsRemaining));
+      chip.classList.remove('hidden');
+    } else {
+      chip.classList.add('hidden');
     }
-
-    if (state.strokeCursor < 0) {
-      primary.textContent = holeLine;
-      secondary.textContent = 'Press Play or scan to reveal shots';
-      return;
-    }
-
-    var stroke = strokes[state.strokeCursor];
-    var dist = PinLabel.shotDistanceForStroke(strokes, state.strokeCursor);
-    var label = PinLabel.getStrokePinLabel(stroke, dist);
-    var sg = formatSg(stroke.SGA);
-
-    primary.textContent =
-      'Shot ' + (state.strokeCursor + 1) + ' of ' + strokes.length + ' · ' + label;
-    var bits = [holeLine];
-    if (sg) bits.push(sg);
-    secondary.textContent = bits.join(' · ');
   }
 
   function updateButtons() {
-    var hole = currentHole();
-    var strokes = gpsStrokes(hole);
-    var atFirstHole = state.holeIndex <= 0;
-    var atLastHole = state.holeIndex >= state.round.holes.length - 1;
-    var atFirstStroke = state.strokeCursor <= -1;
-    var atLastStroke =
-      strokes.length === 0 || state.strokeCursor >= strokes.length - 1;
-
-    $('btn-prev-hole').disabled = atFirstHole;
-    $('btn-next-hole').disabled = atLastHole;
-    $('btn-prev-stroke').disabled = atFirstStroke && atFirstHole;
-    $('btn-next-stroke').disabled = atLastStroke && atLastHole;
-
+    syncFromController();
     var playBtn = $('btn-play');
-    playBtn.textContent = state.playing ? '❚❚ Pause' : '▶ Play';
-    playBtn.title = state.playing ? 'Pause' : 'Play round';
-    playBtn.setAttribute('aria-label', state.playing ? 'Pause' : 'Play round');
-    playBtn.classList.toggle('is-playing', state.playing);
-    playBtn.disabled = atLastStroke && atLastHole && !state.playing;
-
+    var playIcon = playBtn.querySelector('.icon-play');
+    var pauseIcon = playBtn.querySelector('.icon-pause');
+    if (playIcon && pauseIcon) {
+      if (state.playing) {
+        playIcon.hidden = true;
+        pauseIcon.hidden = false;
+      } else {
+        playIcon.hidden = false;
+        pauseIcon.hidden = true;
+      }
+    }
+    playBtn.title = state.playing ? 'Pause' : 'Play';
+    playBtn.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
     $('btn-speed').textContent = state.speed + 'x';
-  }
 
-  /* —— Map —— */
+    var vm = state.controller
+      ? state.controller.getFrameViewModel(state.round)
+      : null;
+    $('btn-prev-stroke').disabled = !(vm && vm.canPrevStroke);
+    $('btn-next-stroke').disabled = !(vm && vm.canNextStroke);
+    $('btn-prev-hole').disabled = !(vm && vm.canPrevHole);
+    $('btn-next-hole').disabled = !(vm && vm.canNextHole);
+  }
 
   function clearMarkers() {
     state.markers.forEach(function (m) {
       m.remove();
     });
     state.markers = [];
-  }
-
-  function ensureTrailLayers() {
-    var map = state.map;
-    if (!map.getSource(TRAIL_SOURCE)) {
-      map.addSource(TRAIL_SOURCE, {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: [] },
-          properties: {},
-        },
-      });
-      map.addLayer({
-        id: TRAIL_OUTLINE,
-        type: 'line',
-        source: TRAIL_SOURCE,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#1b5e20',
-          'line-width': 7,
-          'line-opacity': 0.85,
-        },
-      });
-      map.addLayer({
-        id: TRAIL_LAYER,
-        type: 'line',
-        source: TRAIL_SOURCE,
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 3.5,
-          'line-opacity': 0.98,
-        },
-      });
+    if (state.ballMarker) {
+      state.ballMarker.remove();
+      state.ballMarker = null;
     }
-    if (!map.getSource(POINTS_SOURCE)) {
-      map.addSource(POINTS_SOURCE, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-      map.addLayer({
-        id: POINTS_LAYER,
-        type: 'circle',
-        source: POINTS_SOURCE,
-        paint: {
-          'circle-radius': 6,
-          'circle-color': [
-            'case',
-            ['==', ['get', 'current'], 1],
-            '#c62828',
-            '#ffffff',
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#1b5e20',
-          'circle-opacity': [
-            'case',
-            ['==', ['get', 'revealed'], 1],
-            1,
-            0.35,
-          ],
-        },
-      });
+    if (state.puttMarker) {
+      state.puttMarker.remove();
+      state.puttMarker = null;
     }
   }
 
-  function setTrail(coords) {
-    ensureTrailLayers();
-    state.map.getSource(TRAIL_SOURCE).setData({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: coords.length >= 2 ? coords : [],
-      },
+  function setTrailSegments(segments) {
+    if (!state.mapAdapter) return;
+    state.mapAdapter.setPathSegments(segments || [], {
+      outlineColor: PATH.outline.color,
+      outlineWidth: PATH.outline.width,
+      mainColor: PATH.main.color,
+      mainWidth: PATH.main.width,
     });
   }
 
-  function setPoints(strokes, revealedCount, currentIndex) {
-    ensureTrailLayers();
-    var features = strokes.map(function (stroke, i) {
-      return {
-        type: 'Feature',
-        properties: {
-          revealed: i < revealedCount ? 1 : 0,
-          current: i === currentIndex ? 1 : 0,
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: [stroke.position.longitude, stroke.position.latitude],
-        },
-      };
-    });
-    state.map.getSource(POINTS_SOURCE).setData({
-      type: 'FeatureCollection',
-      features: features,
-    });
-  }
-
-  /**
-   * Frame camera for a hole — matches app round map:
-   * fitToCoordinates(path) + heading (bearing first→last).
-   * Only call when the hole changes, not on every stroke.
-   */
-  function frameHoleCamera(strokes, force) {
-    var map = state.map;
-    if (!map || !strokes.length) return;
-    if (!force && state.cameraHoleIndex === state.holeIndex) return;
-    state.cameraHoleIndex = state.holeIndex;
-
-    var bearing =
-      strokes.length >= 2
-        ? PinLabel.bearingDegrees(
-            strokes[0].position,
-            strokes[strokes.length - 1].position
-          )
-        : 0;
-
-    if (strokes.length === 1) {
-      var only = strokes[0].position;
-      map.easeTo({
-        center: [only.longitude, only.latitude],
-        zoom: 17.2,
-        bearing: bearing,
-        pitch: 0,
-        duration: 400,
-      });
-      return;
-    }
-
-    var bounds = new maplibregl.LngLatBounds();
-    strokes.forEach(function (s) {
-      bounds.extend([s.position.longitude, s.position.latitude]);
-    });
-
-    // Same edgePadding as app fitToCoordinates — fit the path itself, don't inflate deltas
-    map.fitBounds(bounds, {
-      padding: { top: 90, right: 72, bottom: 90, left: 72 },
-      bearing: bearing,
-      pitch: 0,
-      duration: 400,
-      maxZoom: 18.5,
-    });
-  }
-
-  /** Consecutive strokes closer than this (yards) share a cluster and fan out. */
-  var PIN_CLUSTER_YARDS = 28;
-  /** Clearance from GPS point to the near edge of the pill (px). */
-  var PIN_EDGE_GAP_PX = 22;
-  var PIN_CLUSTER_STEP_PX = 22;
-
-  function pathBearingAt(strokes, index) {
-    if (!strokes.length) return 0;
-    if (strokes.length === 1) return 0;
-    if (index < strokes.length - 1) {
-      return PinLabel.bearingDegrees(
-        strokes[index].position,
-        strokes[index + 1].position
-      );
-    }
-    return PinLabel.bearingDegrees(
-      strokes[index - 1].position,
-      strokes[index].position
-    );
-  }
-
-  /**
-   * Unit vectors in screen space for path direction and left-of-play lateral.
-   * Screen y grows downward; path bearing is geographic.
-   */
-  function pathScreenAxes(pathBearingDeg, mapBearingDeg) {
-    var theta = ((pathBearingDeg - mapBearingDeg) * Math.PI) / 180;
-    return {
-      pathX: Math.sin(theta),
-      pathY: -Math.cos(theta),
-      // Left of play = 90° CCW from path dir
-      latX: Math.cos(theta),
-      latY: Math.sin(theta),
-    };
-  }
-
-  /**
-   * Offset so the pill's near edge clears the GPS point by PIN_EDGE_GAP_PX
-   * along the lateral axis (pill is center-anchored via CSS on a 0×0 stack).
-   */
-  function pinOffsetForPill(axes, leftOfPlay, pillEl, extraPx, alongPx) {
-    var halfW = Math.max(pillEl.offsetWidth, 48) / 2;
-    var halfH = Math.max(pillEl.offsetHeight, 24) / 2;
-    var side = leftOfPlay ? 1 : -1;
-    var lx = axes.latX;
-    var ly = axes.latY;
-    var edge =
-      Math.abs(lx) * halfW + Math.abs(ly) * halfH + PIN_EDGE_GAP_PX + (extraPx || 0);
-    var along = alongPx || 0;
-    return [
-      side * lx * edge + axes.pathX * along,
-      side * ly * edge + axes.pathY * along,
-    ];
-  }
-
-  function setPillOffset(stackEl, ox, oy) {
-    stackEl.style.setProperty('--pin-ox', ox + 'px');
-    stackEl.style.setProperty('--pin-oy', oy + 'px');
-  }
-
-  /**
-   * Layout pills off the trail. Default: left of play. Clusters alternate
-   * sides and step outward so overlapping GPS (putts, drops) don't stack.
-   */
-  function buildPinPlans(strokes, mapBearing) {
-    var plans = [];
-    if (!strokes.length) return plans;
-
-    var clusters = [];
-    var group = [0];
-    for (var i = 1; i < strokes.length; i++) {
-      var gap = PinLabel.distanceYards(
-        strokes[i - 1].position,
-        strokes[i].position
-      );
-      if (gap != null && gap < PIN_CLUSTER_YARDS) {
-        group.push(i);
-      } else {
-        clusters.push(group);
-        group = [i];
-      }
-    }
-    clusters.push(group);
-
-    clusters.forEach(function (members) {
-      members.forEach(function (strokeIndex, rank) {
-        var bearing = pathBearingAt(strokes, strokeIndex);
-        var axes = pathScreenAxes(bearing, mapBearing);
-        var leftOfPlay = rank % 2 === 0;
-        var extra = Math.floor(rank / 2) * PIN_CLUSTER_STEP_PX;
-        var along =
-          members.length > 1
-            ? (rank % 2 === 0 ? 1 : -1) * Math.floor(rank / 2) * 10
-            : 0;
-        plans[strokeIndex] = {
-          axes: axes,
-          leftOfPlay: leftOfPlay,
-          side: leftOfPlay ? 'left' : 'right',
-          extra: extra,
-          along: along,
-          bearing: bearing,
-        };
-      });
-    });
-    return plans;
-  }
-
-  function makePinElement(stroke, label, isCurrent, isGhost, side) {
+  function makePinElement(label, lie, selected, offsetSide) {
     var stack = document.createElement('div');
-    stack.className =
-      'pin-stack side-' +
-      (side || 'left') +
-      (isCurrent ? ' current' : '') +
-      (isGhost ? ' ghost' : '');
+    stack.className = 'pin-stack' + (selected ? ' selected' : '');
+
+    var dot = document.createElement('div');
+    dot.className = 'pin-dot';
 
     var pill = document.createElement('div');
-    pill.className = 'pin-pill' + (isCurrent ? ' current' : '');
-    if (stroke.lie === 'Sand') pill.classList.add('sand');
-    pill.style.backgroundColor = PinLabel.lieColor(stroke.lie);
+    pill.className = 'pin-pill' + (selected ? ' selected' : '');
+    if (lie === 'Sand' && !selected) pill.classList.add('sand');
+    if (!selected) pill.style.backgroundColor = PinLabel.lieColor(lie);
     pill.textContent = label;
 
+    var px = PinLabel.pinOffsetPixels(offsetSide || 'up');
+    stack.style.setProperty('--pin-ox', px[0] + 'px');
+    stack.style.setProperty('--pin-oy', px[1] + 'px');
+
+    stack.appendChild(dot);
     stack.appendChild(pill);
     return stack;
   }
 
-  function applyPinOffsets(strokes) {
-    if (!state.map || !strokes.length || !state.markers.length) return;
-    var mapBearing = state.map.getBearing();
-    var plans = buildPinPlans(strokes, mapBearing);
-    state.markers.forEach(function (marker, i) {
-      var plan = plans[i];
-      if (!plan) return;
-      var el = marker.getElement();
-      if (!el) return;
-      var pill = el.querySelector('.pin-pill') || el;
-      var offset = pinOffsetForPill(
-        plan.axes,
-        plan.leftOfPlay,
-        pill,
-        plan.extra,
-        plan.along
-      );
-      setPillOffset(el, offset[0], offset[1]);
-      el.classList.remove('side-left', 'side-right');
-      el.classList.add('side-' + plan.side);
-    });
+  function buildPuttTrackerEl(tracker) {
+    var wrap = document.createElement('div');
+    wrap.className = 'putt-tracker';
+    var maxFeet = tracker.maxFeet || ReplayEngine.PUTT_TRACKER_MAX_FEET;
+    var clamp = function (ft) {
+      return Math.max(0, Math.min(1, ft / maxFeet));
+    };
+
+    if (tracker.phase === 'result') {
+      var result = document.createElement('div');
+      result.className = 'putt-tracker-result';
+      result.innerHTML =
+        '<span class="count">' +
+        tracker.puttCount +
+        '</span><span class="label">' +
+        (tracker.puttCount === 1 ? 'putt' : 'putts') +
+        '</span>';
+      wrap.appendChild(result);
+    } else {
+      var title = document.createElement('p');
+      title.className = 'putt-tracker-title';
+      title.textContent = 'Putting';
+      wrap.appendChild(title);
+    }
+
+    var row = document.createElement('div');
+    row.className = 'putt-track-row';
+
+    var flag = document.createElement('div');
+    flag.className = 'putt-flag';
+    flag.innerHTML =
+      '<div class="putt-flag-pole"></div><div class="putt-flag-cloth"></div><div class="putt-flag-cup"></div>';
+    row.appendChild(flag);
+
+    var track = document.createElement('div');
+    track.className = 'putt-track';
+    track.innerHTML = '<div class="putt-track-line"></div>';
+
+    if (tracker.firstFeet > 0) {
+      var f1 = document.createElement('div');
+      f1.className = 'putt-frame';
+      f1.style.left = clamp(tracker.firstFeet) * 100 + '%';
+      f1.innerHTML =
+        '<div class="putt-frame-box">' +
+        Math.round(tracker.firstFeet) +
+        "'</div><div class=\"putt-frame-point\"></div>";
+      track.appendChild(f1);
+    }
+    if (tracker.puttCount > 1 && tracker.secondFeet > 0) {
+      var f2 = document.createElement('div');
+      f2.className = 'putt-frame';
+      f2.style.left = clamp(tracker.secondFeet) * 100 + '%';
+      f2.innerHTML =
+        '<div class="putt-frame-box">' +
+        Math.round(tracker.secondFeet) +
+        "'</div><div class=\"putt-frame-point\"></div>";
+      track.appendChild(f2);
+    }
+    if (tracker.phase === 'track') {
+      var dot = document.createElement('div');
+      dot.className = 'putt-dot';
+      dot.style.left = clamp(tracker.currentFeet) * 100 + '%';
+      track.appendChild(dot);
+    }
+    row.appendChild(track);
+
+    var end = document.createElement('div');
+    end.className = 'putt-scale-end';
+    end.textContent = maxFeet + "'";
+    row.appendChild(end);
+
+    wrap.appendChild(row);
+    return wrap;
   }
 
-  function renderMapContent(opts) {
-    opts = opts || {};
-    var hole = currentHole();
-    var strokes = gpsStrokes(hole);
-    var empty = $('map-empty');
-    clearMarkers();
+  function frameHoleCamera(holeNumber, force) {
+    if (!state.mapAdapter || !state.timeline) return;
+    if (!force && state.cameraHoleNumber === holeNumber) return;
+    state.cameraHoleNumber = holeNumber;
 
-    if (!strokes.length) {
-      setTrail([]);
-      setPoints([], 0, -1);
+    var hole = holeByNumber(holeNumber);
+    var region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
+    if (!region) return;
+    state.mapAdapter.fitRegion(region, { animated: true });
+  }
+
+  function renderFrame() {
+    if (!state.map || !state.controller) return;
+    syncFromController();
+    var frame = ReplayEngine.getFrameAtTime(state.timeline, state.currentTime);
+    var seg = currentHoleSeg();
+    var holeNumber = seg ? seg.holeNumber : null;
+
+    if (holeNumber != null && holeNumber !== state.lastHoleNumber) {
+      if (state.lastHoleNumber != null && state.mapAdapter) {
+        state.mapAdapter.clearHoleOverlays();
+      }
+      state.lastHoleNumber = holeNumber;
+      frameHoleCamera(holeNumber, true);
+      renderScorecard();
+    }
+
+    updateHeader();
+    updateButtons();
+
+    var empty = $('map-empty');
+    if (!frame || holeNumber == null) {
+      clearMarkers();
+      setTrailSegments([]);
       empty.classList.add('visible');
-      updateShotMeta();
-      updateButtons();
       return;
     }
     empty.classList.remove('visible');
 
-    var revealedCount = state.strokeCursor < 0 ? 0 : state.strokeCursor + 1;
-    var revealed = strokes.slice(0, revealedCount);
-    var coords = revealed.map(function (s) {
-      return [s.position.longitude, s.position.latitude];
+    var segments = ReplayEngine.getReplayPathSegments(
+      state.timeline,
+      state.currentTime
+    ).filter(function (s) {
+      return s.kind === 'swing' && s.holeNumber === holeNumber && s.coordinates.length >= 2;
     });
-    setTrail(coords);
-    setPoints(strokes, revealedCount, state.strokeCursor);
+    setTrailSegments(segments);
 
-    var mapBearing = state.map ? state.map.getBearing() : 0;
-    var plans = buildPinPlans(strokes, mapBearing);
+    clearMarkers();
 
-    // Full hole pins: ghosts for not-yet-played, solid for revealed — beside the trail
-    strokes.forEach(function (stroke, i) {
-      var dist = PinLabel.shotDistanceForStroke(strokes, i);
-      var label = PinLabel.getStrokePinLabel(stroke, dist);
-      var isRevealed = i < revealedCount;
-      var isCurrent = i === state.strokeCursor;
-      var plan = plans[i] || {
-        axes: pathScreenAxes(0, mapBearing),
-        leftOfPlay: true,
-        side: 'left',
-        extra: 0,
-        along: 0,
-      };
-      var el = makePinElement(stroke, label, isCurrent, !isRevealed, plan.side);
+    var pins = ReplayEngine.getReplayPins(state.timeline, state.currentTime).filter(
+      function (p) {
+        return p.holeNumber === holeNumber;
+      }
+    );
+    var positions = pins.map(function (p) {
+      return p.position;
+    });
+    var offsets = PinLabel.mapPinOffsetsForCrowd(positions);
+    var selectedStroke = frame.strokeNumber;
 
-      // Anchor sits on GPS (0×0); pill is offset in CSS perpendicular to the path
+    pins.forEach(function (pin, i) {
+      var selected = pin.strokeNumber === selectedStroke;
+      var el = makePinElement(
+        pin.pinLabel || pin.club || '',
+        pin.lie,
+        selected,
+        offsets[i]
+      );
       var marker = new maplibregl.Marker({
         element: el,
         anchor: 'center',
         offset: [0, 0],
       })
-        .setLngLat([stroke.position.longitude, stroke.position.latitude])
+        .setLngLat([pin.position.longitude, pin.position.latitude])
         .addTo(state.map);
-
-      var pill = el.querySelector('.pin-pill');
-      var offset = pinOffsetForPill(
-        plan.axes,
-        plan.leftOfPlay,
-        pill,
-        plan.extra,
-        plan.along
-      );
-      setPillOffset(el, offset[0], offset[1]);
       state.markers.push(marker);
     });
 
-    // Re-measure after layout + after hole camera bearing settles
-    requestAnimationFrame(function () {
-      applyPinOffsets(strokes);
-    });
-
-    if (opts.reframeCamera) {
-      frameHoleCamera(strokes, true);
-      state.map.once('moveend', function () {
-        applyPinOffsets(strokes);
-      });
+    if (frame.position) {
+      var ballEl = document.createElement('div');
+      ballEl.className = 'ball-marker';
+      state.ballMarker = new maplibregl.Marker({
+        element: ballEl,
+        anchor: 'center',
+      })
+        .setLngLat([frame.position.longitude, frame.position.latitude])
+        .addTo(state.map);
     }
 
-    updateShotMeta();
-    updateButtons();
-  }
-
-  function initMap(cb) {
-    var map = new maplibregl.Map({
-      container: 'watch-map',
-      style: {
-        version: 8,
-        sources: {
-          esri: {
-            type: 'raster',
-            tiles: [ESRI_SAT],
-            tileSize: 256,
-            attribution: 'Tiles © Esri',
-            maxzoom: 19,
-          },
-        },
-        layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
-      },
-      center: [-116.1648, 43.5912],
-      zoom: 15.5,
-      attributionControl: true,
-    });
-
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-    state.map = map;
-
-    map.on('load', function () {
-      ensureTrailLayers();
-      map.resize();
-      if (cb) cb();
-    });
-  }
-
-  /* —— Playback —— */
-
-  function clearPlayTimer() {
-    if (state.playTimer) {
-      clearTimeout(state.playTimer);
-      state.playTimer = null;
-    }
-  }
-
-  function pausePlayback() {
-    state.playing = false;
-    clearPlayTimer();
-    updateButtons();
-  }
-
-  function scheduleNextPlayTick() {
-    clearPlayTimer();
-    if (!state.playing) return;
-    var delay = MS_PER_STROKE / state.speed;
-    state.playTimer = setTimeout(function () {
-      var advanced = advanceStroke(false);
-      if (!advanced) {
-        pausePlayback();
-        return;
+    if (frame.pathKind === 'putt' && frame.puttTracker) {
+      var hole = holeByNumber(holeNumber);
+      var green =
+        (hole && hole.greenPosition) ||
+        frame.position;
+      if (green) {
+        var puttEl = buildPuttTrackerEl(frame.puttTracker);
+        state.puttMarker = new maplibregl.Marker({
+          element: puttEl,
+          anchor: 'bottom',
+          offset: [0, -12],
+        })
+          .setLngLat([green.longitude, green.latitude])
+          .addTo(state.map);
       }
-      scheduleNextPlayTick();
-    }, delay);
+    }
+  }
+
+  function schedulePlay() {
+    clearPlayTimer();
+    syncFromController();
+    if (!state.playing || !state.controller) return;
+    state.playTimer = setInterval(function () {
+      var cont = state.controller.playTick();
+      syncFromController();
+      renderFrame();
+      if (!cont) clearPlayTimer();
+    }, FRAME_MS);
   }
 
   function togglePlayback() {
+    if (!state.controller) return;
+    syncFromController();
     if (state.playing) {
       pausePlayback();
       return;
     }
-    var hole = currentHole();
-    var strokes = gpsStrokes(hole);
-    var atEnd =
-      state.holeIndex >= state.round.holes.length - 1 &&
-      (strokes.length === 0 || state.strokeCursor >= strokes.length - 1);
-    if (atEnd) {
-      // Restart from first GPS hole
-      var start = firstGpsHoleIndex(state.round);
-      selectHole(start, true);
+    if (state.currentTime >= state.timeline.duration) {
+      state.controller.seekTo(0);
     }
-    state.playing = true;
+    state.controller.setPlaying(true);
+    syncFromController();
     updateButtons();
-    scheduleNextPlayTick();
+    schedulePlay();
   }
 
   function cycleSpeed() {
-    state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : 1;
+    if (!state.controller) return;
+    state.controller.cycleSpeed();
+    syncFromController();
     updateButtons();
-    if (state.playing) scheduleNextPlayTick();
+    if (state.playing) schedulePlay();
   }
 
-  /* —— Navigation —— */
-
-  function selectHole(index, resetStroke) {
-    if (!state.round) return;
-    if (index < 0 || index >= state.round.holes.length) return;
-    var holeChanged = index !== state.holeIndex;
-    state.holeIndex = index;
-    if (resetStroke) {
-      var strokes = gpsStrokes(state.round.holes[index]);
-      state.strokeCursor = strokes.length ? 0 : -1;
-    }
-    renderScorecard();
-    renderMapContent({ reframeCamera: holeChanged || resetStroke });
-
-    var activeBtn = document.querySelector(
-      '.scorecard-cell.hole-num[data-hole-index="' + index + '"]'
-    );
-    if (activeBtn) {
-      activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    }
+  function skipNextStroke() {
+    if (!state.controller) return;
+    state.controller.nextStroke();
+    syncFromController();
+    clearPlayTimer();
+    renderFrame();
   }
 
-  /** @returns {boolean} true if advanced */
-  function advanceStroke(fromManual) {
-    if (fromManual) pausePlayback();
-    var hole = currentHole();
-    var strokes = gpsStrokes(hole);
-    if (state.strokeCursor < strokes.length - 1) {
-      state.strokeCursor += 1;
-      // Stay framed on the hole — do not re-zoom per stroke (app behavior)
-      renderMapContent({ reframeCamera: false });
-      return true;
-    }
-    if (state.holeIndex < state.round.holes.length - 1) {
-      selectHole(state.holeIndex + 1, true);
-      return true;
-    }
-    return false;
+  function skipPrevStroke() {
+    if (!state.controller) return;
+    state.controller.prevStroke();
+    syncFromController();
+    clearPlayTimer();
+    renderFrame();
   }
 
-  function nextStroke() {
-    advanceStroke(true);
+  function skipNextHole() {
+    if (!state.controller) return;
+    state.controller.nextHole();
+    syncFromController();
+    clearPlayTimer();
+    renderFrame();
   }
 
-  function prevStroke() {
-    pausePlayback();
-    if (state.strokeCursor > 0) {
-      state.strokeCursor -= 1;
-      renderMapContent({ reframeCamera: false });
-      return;
-    }
-    if (state.strokeCursor === 0) {
-      state.strokeCursor = -1;
-      renderMapContent({ reframeCamera: false });
-      return;
-    }
-    if (state.holeIndex > 0) {
-      var prev = state.holeIndex - 1;
-      var strokes = gpsStrokes(state.round.holes[prev]);
-      state.holeIndex = prev;
-      state.strokeCursor = strokes.length ? strokes.length - 1 : -1;
-      renderScorecard();
-      renderMapContent({ reframeCamera: true });
-    }
-  }
-
-  function nextHole() {
-    pausePlayback();
-    selectHole(state.holeIndex + 1, true);
-  }
-
-  function prevHole() {
-    pausePlayback();
-    selectHole(state.holeIndex - 1, true);
-  }
-
-  /* —— Data load —— */
-
-  function firstGpsHoleIndex(round) {
-    for (var i = 0; i < round.holes.length; i++) {
-      if (gpsStrokes(round.holes[i]).length) return i;
-    }
-    return 0;
-  }
-
-  function boot(round) {
-    state.round = round;
-    updateMeta();
-    var start = firstGpsHoleIndex(round);
-    state.holeIndex = start;
-    var strokes = gpsStrokes(round.holes[start]);
-    state.strokeCursor = strokes.length ? 0 : -1;
-    renderScorecard();
-    updateShotMeta();
-    updateButtons();
-
-    initMap(function () {
-      state.map.resize();
-      renderMapContent({ reframeCamera: true });
-    });
+  function skipPrevHole() {
+    if (!state.controller) return;
+    state.controller.prevHole();
+    syncFromController();
+    clearPlayTimer();
+    renderFrame();
   }
 
   function bindControls() {
-    $('btn-next-stroke').addEventListener('click', nextStroke);
-    $('btn-prev-stroke').addEventListener('click', prevStroke);
-    $('btn-next-hole').addEventListener('click', nextHole);
-    $('btn-prev-hole').addEventListener('click', prevHole);
     $('btn-play').addEventListener('click', togglePlayback);
     $('btn-speed').addEventListener('click', cycleSpeed);
+    $('btn-next-stroke').addEventListener('click', skipNextStroke);
+    $('btn-prev-stroke').addEventListener('click', skipPrevStroke);
+    $('btn-next-hole').addEventListener('click', skipNextHole);
+    $('btn-prev-hole').addEventListener('click', skipPrevHole);
 
     document.addEventListener('keydown', function (e) {
+      if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         togglePlayback();
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        nextStroke();
+        skipNextStroke();
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        prevStroke();
+        skipPrevStroke();
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        nextHole();
+        skipNextHole();
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        prevHole();
+        skipPrevHole();
       }
     });
+  }
+
+  function initMap(cb) {
+    var map = new maplibregl.Map({
+      container: 'watch-map',
+      style: STYLIZED_STYLE,
+      center: [-116.1648, 43.5912],
+      zoom: 15.5,
+      attributionControl: false,
+    });
+    state.map = map;
+    state.mapAdapter = MapLibreReplayAdapter.create(map, {
+      onClear: clearMarkers,
+    });
+    map.on('load', function () {
+      // Warm path layers via empty segments
+      setTrailSegments([]);
+      map.resize();
+      if (cb) cb();
+    });
+  }
+
+  function boot(doc) {
+    var normalized = ReplayEngine.normalizeRoundForReplay(doc);
+    state.round = normalized;
+    state.timeline = ReplayEngine.buildRoundReplayTimeline(normalized);
+    state.controller = ReplayEngine.createReplayController(state.timeline);
+    syncFromController();
+    state.cameraHoleNumber = null;
+    state.lastHoleNumber = null;
+
+    var meta = normalized.meta || {};
+    $('meta-course').textContent = meta.course || 'Shared round';
+    var bits = [];
+    if (meta.tees) bits.push(meta.tees + (/\btees?\b/i.test(meta.tees) ? '' : ' tees'));
+    if (meta.datePlayed) bits.push(formatDate(meta.datePlayed));
+    if (meta.playerDisplayName) bits.push(meta.playerDisplayName);
+    var durationEl = $('meta-duration');
+    if (bits.length) {
+      durationEl.textContent = bits.join(' · ');
+      durationEl.hidden = false;
+      $('meta-course').title = bits.join(' · ');
+    } else {
+      durationEl.textContent = '';
+      durationEl.hidden = true;
+    }
+
+    var cta = $('cta-app');
+    if (typeof APP_STORE_URL === 'string' && APP_STORE_URL) {
+      cta.href = APP_STORE_URL;
+    } else {
+      cta.href = '../';
+    }
+
+    if (!state.timeline.frames.length) {
+      $('map-empty').classList.add('visible');
+      $('meta-hole').textContent = bits.join(' · ') || 'No GPS Data';
+      renderScorecard();
+      updateButtons();
+      return;
+    }
+
+    function start() {
+      renderScorecard();
+      renderFrame();
+      var firstSeg = state.timeline.holes[0];
+      if (firstSeg) frameHoleCamera(firstSeg.holeNumber, true);
+    }
+
+    if (state.map && state.map.loaded()) start();
+    else initMap(start);
   }
 
   bindControls();
 
   ShareCodec.loadRoundFromUrl()
-    .then(boot)
+    .then(function (doc) {
+      try {
+        boot(doc);
+      } catch (err) {
+        console.error(err);
+        $('meta-course').textContent = 'Could not load round';
+        var dur = $('meta-duration');
+        if (dur) {
+          dur.hidden = false;
+          dur.textContent = (err && err.message) || 'Unable to load replay data.';
+        }
+        $('meta-hole').textContent = 'Use #r=… share link or ?fixture=sample-round';
+        $('map-empty').classList.add('visible');
+        $('map-empty').querySelector('p').textContent =
+          (err && err.message) || 'Unable to load replay data.';
+      }
+    })
     .catch(function (err) {
       console.error(err);
       $('meta-course').textContent = 'Could not load round';
-      $('meta-sub').textContent =
-        'Use #r=… share link or ?fixture=sample-round';
+      var dur = $('meta-duration');
+      if (dur) {
+        dur.hidden = false;
+        dur.textContent = (err && err.message) || 'Unable to load replay data.';
+      }
+      $('meta-hole').textContent = 'Use #r=… share link or ?fixture=sample-round';
       $('map-empty').classList.add('visible');
       $('map-empty').querySelector('p').textContent =
         (err && err.message) || 'Unable to load replay data.';

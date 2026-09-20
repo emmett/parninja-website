@@ -93,6 +93,80 @@
     return (bearing + 360) % 360;
   }
 
+  /** ~12 m cluster — matches MapPinLabel CROWD_CLUSTER_DEG */
+  var CROWD_CLUSTER_DEG = 0.00012;
+  var CROWD_OFFSETS = ['up', 'up-right', 'up-left'];
+
+  /**
+   * Crowd offsets for stacked pins (TF 192 MapStrokePin).
+   * Cycles up / up-right / up-left within geographic clusters.
+   */
+  function mapPinOffsetsForCrowd(positions, clusterDeg) {
+    clusterDeg = clusterDeg != null ? clusterDeg : CROWD_CLUSTER_DEG;
+    var n = positions.length;
+    var offsets = [];
+    for (var zi = 0; zi < n; zi++) offsets.push('up');
+    var parent = [];
+    for (var pi = 0; pi < n; pi++) parent.push(pi);
+
+    function find(i) {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+      }
+      return i;
+    }
+    function unite(a, b) {
+      var ra = find(a);
+      var rb = find(b);
+      if (ra !== rb) parent[rb] = ra;
+    }
+
+    for (var i = 0; i < n; i++) {
+      var a = positions[i];
+      if (!a) continue;
+      for (var j = i + 1; j < n; j++) {
+        var b = positions[j];
+        if (!b) continue;
+        if (
+          Math.abs(a.latitude - b.latitude) <= clusterDeg &&
+          Math.abs(a.longitude - b.longitude) <= clusterDeg
+        ) {
+          unite(i, j);
+        }
+      }
+    }
+
+    var groups = {};
+    for (var gi = 0; gi < n; gi++) {
+      if (!positions[gi]) continue;
+      var root = find(gi);
+      if (!groups[root]) groups[root] = [];
+      groups[root].push(gi);
+    }
+
+    Object.keys(groups).forEach(function (key) {
+      var members = groups[key];
+      if (members.length < 2) return;
+      members.sort(function (ia, ib) {
+        var pa = positions[ia];
+        var pb = positions[ib];
+        return pa.longitude - pb.longitude || pa.latitude - pb.latitude;
+      });
+      members.forEach(function (idx, rank) {
+        offsets[idx] = CROWD_OFFSETS[rank % CROWD_OFFSETS.length];
+      });
+    });
+    return offsets;
+  }
+
+  /** Pixel offset for MapLibre Marker (anchor center); ~app MapStrokePin 62px fan. */
+  function pinOffsetPixels(side) {
+    if (side === 'up-left') return [-52, -30];
+    if (side === 'up-right') return [52, -30];
+    return [0, -36]; // up
+  }
+
   global.PinLabel = {
     LIE_PIN_COLORS: LIE_PIN_COLORS,
     getStrokePinLabel: getStrokePinLabel,
@@ -100,5 +174,8 @@
     distanceYards: distanceYards,
     shotDistanceForStroke: shotDistanceForStroke,
     bearingDegrees: bearingDegrees,
+    mapPinOffsetsForCrowd: mapPinOffsetsForCrowd,
+    pinOffsetPixels: pinOffsetPixels,
+    CROWD_OFFSETS: CROWD_OFFSETS,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
