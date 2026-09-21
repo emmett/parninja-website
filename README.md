@@ -93,7 +93,7 @@ Production (after deploy): `https://parninja.com/watch/` and `https://parninja.c
 
 The player matches the in-app **TF 192 screen-player contract** via shared **`@parninja/replay`** (engine + controller + tokens), with chrome/transport/yards/pins aligned to `RoundReplayPlayer`. Source of truth: `parninja/packages/replay`. `/watch` loads a generated IIFE (`watch/js/replayEngine.js`) — rebuild with `scripts/build-replay-engine.sh` or from the app: `npm run build:watch-replay`. Encode stays parked.
 
-**Intentional diffs vs native:** Esri World Imagery basemap (app uses Apple/Google mutedStandard + stylized greens); web CTA link instead of in-app share sheet; no modal close chrome; scorecard chrome simplified (no putt counts under cells).
+**Intentional diffs vs native:** Esri World Imagery basemap (app uses Apple/Google mutedStandard + stylized greens); brand icon opens App Store (no in-app deeplink yet); no modal close chrome.
 
 **Canonical app format = v2 pack** (below). Verbose fixtures remain for local/`?fixture=` testing only.
 

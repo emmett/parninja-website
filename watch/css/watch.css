@@ -36,32 +36,40 @@ body {
   background: var(--white);
 }
 
+/* Header + scorecard — fluid for phone and laptop */
 .watch-top {
   flex-shrink: 0;
   background: var(--white);
   border-bottom: none;
   z-index: 4;
+  padding-top: env(safe-area-inset-top);
 }
 
 .watch-brand {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.65rem 0.35rem;
+  padding: 0.4rem 0.65rem 0.25rem;
 }
 
 .brand-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   text-decoration: none;
   flex-shrink: 0;
   border-radius: 8px;
 }
 
+.brand-link:hover {
+  background: #e8f5e9;
+}
+
 .brand-link img {
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
 }
 
@@ -73,7 +81,7 @@ body {
 
 .watch-meta .course {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: #1f2937;
   white-space: nowrap;
@@ -82,10 +90,13 @@ body {
 }
 
 .watch-meta .sub {
-  margin: 0.1rem 0 0;
-  font-size: 0.75rem;
+  margin: 0.05rem 0 0;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .watch-meta .meta-duration[hidden] {
@@ -100,7 +111,7 @@ body {
   font: inherit;
   font-size: 0.8125rem;
   font-weight: 700;
-  padding: 0.4rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 14px;
   cursor: pointer;
   min-width: 44px;
@@ -110,10 +121,11 @@ body {
   filter: brightness(0.97);
 }
 
+/* Fluid front/back scorecard — fills width on phone, caps on laptop. */
 .scorecard-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.35rem 0.65rem 0.55rem;
+  padding: 0.15rem 0.4rem 0.35rem;
   scrollbar-width: none;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -124,54 +136,87 @@ body {
 
 .scorecard {
   display: flex;
-  gap: 0.3rem;
-  width: max-content;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: 560px;
   margin: 0 auto;
 }
 
+.scorecard-row {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(34px, 0.95fr);
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1px 0;
+}
+
+.scorecard-row:last-child {
+  border-bottom: none;
+}
+
 .scorecard-cell {
-  width: 36px;
-  flex-shrink: 0;
+  width: auto;
+  min-width: 0;
   border: none;
-  background: var(--score-idle);
-  border-radius: 8px;
-  padding: 0.3rem 0.15rem;
+  background: transparent;
+  border-radius: 6px;
+  padding: 1px 0;
   cursor: pointer;
   font: inherit;
   color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .scorecard-cell:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 
 .scorecard-cell.active {
-  background: var(--forest);
-  color: #fff;
+  background: #e8f5e9;
 }
 
 .scorecard-cell .hole-num {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.625rem;
   font-weight: 600;
-  opacity: 0.75;
+  color: #333;
   line-height: 1.1;
 }
 
 .scorecard-cell.active .hole-num {
-  opacity: 0.9;
-  color: #fff;
+  color: #14532d;
+}
+
+.scorecard-cell .hole-par {
+  display: block;
+  font-size: 0.5625rem;
+  color: #666;
+  line-height: 1.15;
+  margin-top: 0;
+}
+
+.scorecard-cell .score-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  min-height: 1.75rem;
 }
 
 .scorecard-cell .score-val {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 1.35rem;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
+  color: #111;
 }
 
 .scorecard-cell .score-val.birdie {
@@ -182,17 +227,22 @@ body {
   color: var(--bogey);
 }
 
-.scorecard-cell.active .score-val {
-  color: #fff;
+.scorecard-cell .hole-putts {
+  display: block;
+  font-size: 0.5625rem;
+  color: #666;
+  line-height: 1.1;
+  margin-top: 0;
 }
 
 .score-shape {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.15rem;
-  height: 1.15rem;
-  padding: 0 2px;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 1px;
+  font-size: inherit;
 }
 
 .score-shape.circle {
@@ -202,12 +252,194 @@ body {
 
 .score-shape.square {
   border: 1.5px solid currentColor;
+  border-radius: 3px;
+  background: #fff3e0;
 }
 
 .score-shape.double-square {
   border: 1.5px solid currentColor;
+  border-radius: 3px;
   box-shadow: inset 0 0 0 1.5px currentColor;
-  padding: 0 3px;
+  background: #ffebee;
+  padding: 0 2px;
+}
+
+.scorecard-total {
+  width: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1px 0 1px 3px;
+  border-left: 1px solid #e5e7eb;
+  margin-left: 1px;
+}
+
+.scorecard-total .total-label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.scorecard-total .total-par {
+  font-size: 0.5625rem;
+  color: #666;
+  margin-top: 0;
+  line-height: 1.15;
+}
+
+.scorecard-total .total-score {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #111;
+  margin-top: 3px;
+  line-height: 1;
+}
+
+.scorecard-total .total-putts {
+  font-size: 0.5625rem;
+  color: #666;
+  margin-top: 0;
+  line-height: 1.1;
+}
+
+.scorecard-total .total-net {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #333;
+  margin-top: 1px;
+  line-height: 1.1;
+}
+
+.scorecard-total .total-net.over {
+  color: #f44336;
+}
+
+.scorecard-total .total-net.under {
+  color: #4caf50;
+}
+
+/* Phone landscape / short height: keep map usable */
+@media (max-height: 520px) {
+  .watch-meta .sub.meta-duration {
+    display: none;
+  }
+
+  .scorecard-cell .hole-putts,
+  .scorecard-total .total-putts {
+    display: none;
+  }
+
+  .scorecard-cell .score-stack {
+    min-height: 1.25rem;
+  }
+}
+
+/* Narrow phones */
+@media (max-width: 380px) {
+  .watch-brand {
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
+
+  .brand-link {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-link img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .scorecard-wrap {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+}
+
+/* Tablet / laptop */
+@media (min-width: 640px) {
+  .watch-brand {
+    padding: 0.55rem 1rem 0.35rem;
+  }
+
+  .brand-link {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-link img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .watch-meta .course {
+    font-size: 1.0625rem;
+  }
+
+  .watch-meta .sub {
+    font-size: 0.75rem;
+  }
+
+  .scorecard-wrap {
+    padding: 0.25rem 1rem 0.45rem;
+  }
+
+  .scorecard {
+    max-width: 640px;
+  }
+
+  .scorecard-row {
+    grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(42px, 0.9fr);
+    padding: 3px 0;
+  }
+
+  .scorecard-cell {
+    border-radius: 8px;
+    padding: 2px 1px;
+  }
+
+  .scorecard-cell .hole-num {
+    font-size: 0.75rem;
+  }
+
+  .scorecard-cell .hole-par,
+  .scorecard-cell .hole-putts,
+  .scorecard-total .total-par,
+  .scorecard-total .total-putts,
+  .scorecard-total .total-label {
+    font-size: 0.625rem;
+  }
+
+  .scorecard-cell .score-val,
+  .scorecard-total .total-score {
+    font-size: 0.875rem;
+  }
+
+  .scorecard-cell .score-stack {
+    min-height: 2.1rem;
+    margin-top: 2px;
+  }
+
+  .score-shape {
+    min-width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .scorecard-total .total-net {
+    font-size: 0.75rem;
+  }
+}
+
+@media (min-width: 960px) {
+  .scorecard {
+    max-width: 720px;
+  }
 }
 
 .watch-map-wrap {
@@ -262,15 +494,16 @@ body {
   line-height: 16px;
 }
 
-/* Putt tracker lives in the safe inset band — not anchored over the green. */
+/* Putt tracker in the safe-inset band — matches app mapPuttOverlayWrap. */
 .putt-overlay {
   position: absolute;
-  top: 58px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 18%;
+  left: 18%;
+  right: 18%;
   z-index: 5;
   pointer-events: none;
-  max-width: min(340px, calc(100% - 48px));
+  display: flex;
+  justify-content: center;
 }
 
 .putt-overlay.hidden {
@@ -279,7 +512,42 @@ body {
 
 .putt-overlay .putt-tracker {
   margin: 0 auto;
+  width: 100%;
+  max-width: 320px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+@media (max-width: 420px) {
+  .putt-overlay {
+    top: 12%;
+    left: 4%;
+    right: 4%;
+  }
+
+  .yards-panel {
+    padding: 5px 12px;
+  }
+
+  .yards-value {
+    font-size: 22px;
+    line-height: 26px;
+  }
+
+  .yards-unit {
+    font-size: 11px;
+  }
+}
+
+@media (min-width: 640px) {
+  .putt-overlay .putt-tracker {
+    max-width: 360px;
+  }
+
+  .map-controls-overlay {
+    left: 16px;
+    right: 16px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
 }
 
 .map-empty {
@@ -427,20 +695,6 @@ body {
 .play-btn .icon-pause[hidden],
 .play-btn .icon-play[hidden] {
   display: none;
-}
-
-.cta-app {
-  font-size: 12px;
-  font-weight: 700;
-  color: #2e7d32;
-  text-decoration: none;
-  padding: 4px 8px;
-  background: transparent;
-  border-radius: 8px;
-}
-
-.cta-app:hover {
-  text-decoration: underline;
 }
 
 /* Pin: GPS dot at coordinate; pill offset via CSS vars (match MapStrokePin) */

@@ -20,7 +20,7 @@
     MAP_VIEWPORT_SAFE_INSET: () => MAP_VIEWPORT_SAFE_INSET,
     MIN_LATITUDE_DELTA: () => MIN_LATITUDE_DELTA,
     PLAYBACK_SPEEDS: () => PLAYBACK_SPEEDS,
-    PUTT_TRACKER_MAX_FEET: () => PUTT_TRACKER_MAX_FEET,
+    PUTT_TRACKER_SCALE: () => PUTT_TRACKER_SCALE,
     STYLIZED_LANDSCAPE: () => STYLIZED_LANDSCAPE,
     applyFrameToMapAdapter: () => applyFrameToMapAdapter,
     buildHoleReplayTimeline: () => buildHoleReplayTimeline,
@@ -50,12 +50,17 @@
     interpolateFlightPath: () => interpolateFlightPath,
     nextPlaybackSpeed: () => nextPlaybackSpeed,
     normalizeRoundForReplay: () => normalizeRoundForReplay,
+    puttTrackerMaxFeet: () => puttTrackerMaxFeet,
     regionFramingPoints: () => regionFramingPoints,
     toReplayMapFrame: () => toReplayMapFrame
   });
 
   // packages/replay/src/tokens.ts
-  var PUTT_TRACKER_MAX_FEET = 50;
+  var PUTT_TRACKER_SCALE = 1.5;
+  function puttTrackerMaxFeet(firstFeet) {
+    const first = Math.max(0, firstFeet);
+    return Math.max(1, Math.round(first * PUTT_TRACKER_SCALE));
+  }
   var MAP_VIEWPORT_SAFE_INSET = 0.18;
   var MIN_LATITUDE_DELTA = 25e-4;
   var FRAME_MS = 33;
@@ -242,7 +247,7 @@
     const firstFeet = Math.max(0, Math.round(firstYards * 3));
     const lastYards = typeof stroke.lastPuttDistance === "number" && stroke.lastPuttDistance > 0 ? stroke.lastPuttDistance : 0;
     const secondFeet = puttCount <= 1 ? 0 : Math.max(0, Math.round(lastYards * 3));
-    return { firstFeet, secondFeet, puttCount };
+    return { firstFeet, secondFeet, puttCount, maxFeet: puttTrackerMaxFeet(firstFeet) };
   }
   function appendPuttReplayFrames(args) {
     var _a, _b, _c;
@@ -250,7 +255,7 @@
     let currentTime = args.startTime;
     const holdPos = (_c = ((_a = puttStroke.position) == null ? void 0 : _a.latitude) && ((_b = puttStroke.position) == null ? void 0 : _b.longitude) ? puttStroke.position : null) != null ? _c : getHoleGreen(hole);
     if (!holdPos) return currentTime;
-    const { firstFeet, secondFeet, puttCount } = buildPuttTrackerDistances(puttStroke);
+    const { firstFeet, secondFeet, puttCount, maxFeet } = buildPuttTrackerDistances(puttStroke);
     const pinLabel = formatReplayPinLabel(puttStroke, null);
     const strokeDuration = config.msPerStroke / config.speedMultiplier;
     const trackFrames = Math.max(2, config.flightFramesPerStroke);
@@ -272,7 +277,7 @@
         lie: puttStroke.lie,
         pinLabel,
         puttTracker: {
-          maxFeet: PUTT_TRACKER_MAX_FEET,
+          maxFeet,
           firstFeet,
           secondFeet,
           puttCount,
@@ -299,7 +304,7 @@
         lie: puttStroke.lie,
         pinLabel,
         puttTracker: {
-          maxFeet: PUTT_TRACKER_MAX_FEET,
+          maxFeet,
           firstFeet,
           secondFeet,
           puttCount,

@@ -89,6 +89,24 @@
     return '';
   }
 
+  /** Putts on green — matches ExpandedMicroScorecard.getPutts. */
+  function getPutts(hole) {
+    if (!hole || !hole.strokes || !hole.strokes.length) return 0;
+    var putts = 0;
+    hole.strokes.forEach(function (stroke) {
+      if (stroke.club !== 'PU' || stroke.lie !== 'Green') return;
+      putts += stroke.strokeCount != null ? stroke.strokeCount : 1;
+    });
+    return putts;
+  }
+
+  function holeScore(hole) {
+    if (!hole) return null;
+    if (hole.blowup) return (hole.par || 0) * 2;
+    if (hole.score != null) return hole.score;
+    return null;
+  }
+
   function holeByNumber(n) {
     if (!state.round) return null;
     return (
@@ -146,46 +164,166 @@
       });
     }
 
-    state.round.holes.forEach(function (hole, index) {
+    var byNumber = {};
+    state.round.holes.forEach(function (hole) {
+      byNumber[hole.holeNumber] = hole;
+    });
+
+    function makeHoleCell(holeNumber) {
+      var hole = byNumber[holeNumber];
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'scorecard-cell';
-      if (hole.holeNumber === activeHole) btn.classList.add('active');
-      btn.disabled = !playable[hole.holeNumber];
-      btn.setAttribute('data-hole', String(hole.holeNumber));
+      if (holeNumber === activeHole) btn.classList.add('active');
+      btn.disabled = !hole || !playable[holeNumber];
+      btn.setAttribute('data-hole', String(holeNumber));
 
       var num = document.createElement('span');
       num.className = 'hole-num';
-      num.textContent = String(hole.holeNumber);
+      num.textContent = String(holeNumber);
+      btn.appendChild(num);
+
+      var parEl = document.createElement('span');
+      parEl.className = 'hole-par';
+      parEl.textContent = hole && hole.par != null ? String(hole.par) : '—';
+      btn.appendChild(parEl);
+
+      var score = hole ? holeScore(hole) : null;
+      var putts = hole ? getPutts(hole) : 0;
+
+      var scoreWrap = document.createElement('span');
+      scoreWrap.className = 'score-stack';
 
       var val = document.createElement('span');
-      val.className = 'score-val ' + scoreTone(hole.score, hole.par);
-      var shape = scoreShapeClass(hole.score, hole.par);
-      if (hole.score != null && shape) {
-        var wrap = document.createElement('span');
-        wrap.className = 'score-shape ' + shape;
-        wrap.textContent = String(hole.score);
-        val.appendChild(wrap);
+      val.className = 'score-val ' + scoreTone(score, hole && hole.par);
+      var shape = scoreShapeClass(score, hole && hole.par);
+      if (score != null && shape) {
+        var shapeEl = document.createElement('span');
+        shapeEl.className = 'score-shape ' + shape;
+        shapeEl.textContent = String(score);
+        val.appendChild(shapeEl);
       } else {
-        val.textContent = hole.score != null ? String(hole.score) : '—';
+        val.textContent = score != null ? String(score) : '—';
       }
+      scoreWrap.appendChild(val);
 
-      btn.appendChild(num);
-      btn.appendChild(val);
+      var puttsEl = document.createElement('span');
+      puttsEl.className = 'hole-putts';
+      puttsEl.textContent = score != null ? String(putts) : '—';
+      scoreWrap.appendChild(puttsEl);
+
+      btn.appendChild(scoreWrap);
+
       btn.addEventListener('click', function () {
         if (!state.timeline) return;
         var target = state.timeline.holes.find(function (h) {
-          return h.holeNumber === hole.holeNumber;
+          return h.holeNumber === holeNumber;
         });
         if (!target) return;
         seekTo(target.startMs, { pause: true });
       });
-      el.appendChild(btn);
+      return btn;
+    }
 
-      if (hole.holeNumber === activeHole) {
-        btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    function makeTotalCell(holes, label) {
+      var played = holes.filter(function (hole) {
+        return hole && (holeScore(hole) != null || (hole.strokes && hole.strokes.length));
+      });
+      var totalPar = played.reduce(function (sum, hole) {
+        return sum + (hole.par || 0);
+      }, 0);
+      var totalScore = played.reduce(function (sum, hole) {
+        return sum + (holeScore(hole) || 0);
+      }, 0);
+      var totalPutts = played.reduce(function (sum, hole) {
+        return sum + getPutts(hole);
+      }, 0);
+      var net = totalScore - totalPar;
+
+      var cell = document.createElement('div');
+      cell.className = 'scorecard-total';
+      cell.setAttribute('aria-label', label + ' total');
+
+      var labelEl = document.createElement('span');
+      labelEl.className = 'total-label';
+      labelEl.textContent = label;
+      cell.appendChild(labelEl);
+
+      var parEl = document.createElement('span');
+      parEl.className = 'total-par';
+      parEl.textContent = played.length ? String(totalPar) : '—';
+      cell.appendChild(parEl);
+
+      var scoreEl = document.createElement('span');
+      scoreEl.className = 'total-score';
+      scoreEl.textContent = played.length ? String(totalScore) : '—';
+      cell.appendChild(scoreEl);
+
+      var puttsEl = document.createElement('span');
+      puttsEl.className = 'total-putts';
+      puttsEl.textContent = played.length ? String(totalPutts) : '—';
+      cell.appendChild(puttsEl);
+
+      var netEl = document.createElement('span');
+      netEl.className =
+        'total-net' +
+        (played.length ? (net > 0 ? ' over' : net < 0 ? ' under' : '') : '');
+      netEl.textContent = played.length
+        ? (net > 0 ? '+' : '') + String(net)
+        : '—';
+      cell.appendChild(netEl);
+
+      return cell;
+    }
+
+    function renderRow(start, end, totalLabel) {
+      var row = document.createElement('div');
+      row.className = 'scorecard-row';
+      var holes = [];
+      for (var n = start; n <= end; n++) {
+        row.appendChild(makeHoleCell(n));
+        if (byNumber[n]) holes.push(byNumber[n]);
       }
-    });
+      row.appendChild(makeTotalCell(holes, totalLabel));
+      return row;
+    }
+
+    el.appendChild(renderRow(1, 9, 'Out'));
+    el.appendChild(renderRow(10, 18, 'In'));
+
+    if (activeHole != null) {
+      var activeBtn = el.querySelector(
+        '.scorecard-cell[data-hole="' + activeHole + '"]'
+      );
+      if (activeBtn) {
+        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }
+
+  function appStoreUrl() {
+    var cfg =
+      typeof window.SITE_CONFIG === 'object' && window.SITE_CONFIG
+        ? window.SITE_CONFIG
+        : null;
+    var app = cfg && cfg.apps && cfg.apps[0];
+    if (app && typeof app.iosUrl === 'string' && app.iosUrl) return app.iosUrl;
+    if (typeof APP_STORE_URL === 'string' && APP_STORE_URL) return APP_STORE_URL;
+    return '../';
+  }
+
+  function wireBrandLink() {
+    var link = $('brand-link');
+    if (!link) return;
+    // No in-app deeplink yet — send visitors to the App Store (or site).
+    link.href = appStoreUrl();
+    if (/^https?:/i.test(link.href)) {
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+    } else {
+      link.removeAttribute('target');
+      link.removeAttribute('rel');
+    }
   }
 
   function updateHeader() {
@@ -321,9 +459,14 @@
   function buildPuttTrackerEl(tracker) {
     var wrap = document.createElement('div');
     wrap.className = 'putt-tracker';
-    var maxFeet = tracker.maxFeet || ReplayEngine.PUTT_TRACKER_MAX_FEET;
+    // App: scale max = 1.5× first putt (puttTrackerMaxFeet).
+    var maxFeet =
+      tracker.maxFeet ||
+      (ReplayEngine.puttTrackerMaxFeet
+        ? ReplayEngine.puttTrackerMaxFeet(tracker.firstFeet || 0)
+        : Math.max(1, Math.round((tracker.firstFeet || 0) * 1.5)));
     var clamp = function (ft) {
-      return Math.max(0, Math.min(1, ft / maxFeet));
+      return maxFeet <= 0 ? 0 : Math.max(0, Math.min(1, ft / maxFeet));
     };
 
     if (tracker.phase === 'result') {
@@ -630,6 +773,9 @@
       map.resize();
       if (cb) cb();
     });
+    window.addEventListener('resize', function () {
+      if (state.map) state.map.resize();
+    });
   }
 
   function boot(doc) {
@@ -657,12 +803,7 @@
       durationEl.hidden = true;
     }
 
-    var cta = $('cta-app');
-    if (typeof APP_STORE_URL === 'string' && APP_STORE_URL) {
-      cta.href = APP_STORE_URL;
-    } else {
-      cta.href = '../';
-    }
+    wireBrandLink();
 
     if (!state.timeline.frames.length) {
       $('map-empty').classList.add('visible');
