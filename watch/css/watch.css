@@ -36,11 +36,11 @@ body {
   background: var(--white);
 }
 
-/* Header + scorecard — fluid for phone and laptop */
+/* Slim top meta — map is the main viewport */
 .watch-top {
   flex-shrink: 0;
   background: var(--white);
-  border-bottom: none;
+  border-bottom: 1px solid #e5e7eb;
   z-index: 4;
   padding-top: env(safe-area-inset-top);
 }
@@ -125,7 +125,7 @@ body {
 .scorecard-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.15rem 0.4rem 0.35rem;
+  padding: 0.25rem 0.4rem 0.2rem;
   scrollbar-width: none;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -494,12 +494,12 @@ body {
   line-height: 16px;
 }
 
-/* Putt tracker in the safe-inset band — matches app mapPuttOverlayWrap. */
+/* Light map overlays only — chrome lives in .watch-bottom */
 .putt-overlay {
   position: absolute;
-  top: 18%;
-  left: 18%;
-  right: 18%;
+  top: 12px;
+  left: 12px;
+  right: 12px;
   z-index: 5;
   pointer-events: none;
   display: flex;
@@ -518,12 +518,6 @@ body {
 }
 
 @media (max-width: 420px) {
-  .putt-overlay {
-    top: 12%;
-    left: 4%;
-    right: 4%;
-  }
-
   .yards-panel {
     padding: 5px 12px;
   }
@@ -536,18 +530,35 @@ body {
   .yards-unit {
     font-size: 11px;
   }
+
+  .putt-overlay {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
 }
 
 @media (min-width: 640px) {
   .putt-overlay .putt-tracker {
     max-width: 360px;
   }
+}
 
-  .map-controls-overlay {
-    left: 16px;
-    right: 16px;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
+/* Bottom dock: scorecard + transport (not overlaid on the map) */
+.watch-bottom {
+  flex-shrink: 0;
+  background: var(--white);
+  border-top: 1px solid #e5e7eb;
+  z-index: 4;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.watch-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0.35rem 0.65rem 0.55rem;
 }
 
 .map-empty {
@@ -581,31 +592,12 @@ body {
   font-size: 0.875rem !important;
 }
 
-/* Match app mapControlsOverlay */
-.map-controls-overlay {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 0;
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
-  pointer-events: none;
-}
-
-.map-controls-overlay > * {
-  pointer-events: auto;
-}
-
 .stroke-scrubber {
   align-self: center;
-  background: rgba(255, 255, 255, 0.94);
+  background: #f8faf8;
   border-radius: 16px;
   padding: 6px 10px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.1);
   text-align: center;
 }
 
@@ -649,14 +641,14 @@ body {
 
 .playback-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 4px;
   width: min(100%, 320px);
-  background: rgba(255, 255, 255, 0.94);
+  background: #f8faf8;
   border-radius: 28px;
   padding: 4px 8px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.1);
 }
 
 .skip-btn {

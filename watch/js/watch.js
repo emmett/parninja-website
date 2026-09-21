@@ -36,7 +36,6 @@
     mapAdapter: null,
     playTimer: null,
     cameraHoleNumber: null,
-    cameraPadMode: null, // 'hole' | 'putt'
     markers: [],
     ballMarker: null,
     puttMarker: null,
@@ -537,90 +536,33 @@
     return wrap;
   }
 
-  function mapChromePadding(opts) {
-    opts = opts || {};
+  function mapChromePadding() {
     var wrap = document.querySelector('.watch-map-wrap');
     var h = wrap ? wrap.clientHeight : 600;
     var w = wrap ? wrap.clientWidth : 400;
-    var controls = document.querySelector('.map-controls-overlay');
-
-    // Scrubber + transport sit in the map; pad at least that tall (+ cushion).
-    var bottomChrome = controls ? Math.ceil(controls.getBoundingClientRect().height) : 0;
-    bottomChrome = Math.max(168, bottomChrome + 36);
-
-    var topChrome = Math.max(16, Math.round(h * 0.05));
-    if (opts.forPutt) {
-      // Room for the putt tracker card in the upper safe band.
-      topChrome = Math.max(topChrome, Math.round(h * 0.3), 140);
-    }
-    if (opts.extraTop) topChrome = Math.max(topChrome, opts.extraTop);
-
-    // Never let padding eat the whole map.
-    var maxBottom = Math.round(h * 0.42);
-    var maxTop = Math.round(h * 0.4);
+    // Chrome is outside the map — light pad for yards / putt card only.
     var side = Math.max(20, Math.round(w * 0.05));
     return {
-      top: Math.min(maxTop, topChrome),
-      bottom: Math.min(maxBottom, bottomChrome),
+      top: Math.max(28, Math.round(h * 0.1)),
+      bottom: Math.max(24, Math.round(h * 0.06)),
       left: side,
       right: side,
     };
   }
 
-  /** Hole frame: tee + green + swing GPS, padded for web chrome. */
+  /** Hole frame: tee + green + swing GPS (stable full-hole zoom). */
   function frameHoleCamera(holeNumber, force, opts) {
     if (!state.mapAdapter || !state.timeline) return;
     opts = opts || {};
-    if (
-      !force &&
-      state.cameraHoleNumber === holeNumber &&
-      state.cameraPadMode === 'hole'
-    ) {
-      return;
-    }
+    if (!force && state.cameraHoleNumber === holeNumber) return;
     state.cameraHoleNumber = holeNumber;
-    state.cameraPadMode = 'hole';
 
     var hole = holeByNumber(holeNumber);
     var region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
     if (!region) return;
     state.mapAdapter.fitRegion(region, {
       animated: opts.animated !== false,
-      padding: mapChromePadding({ forPutt: false }),
-    });
-  }
-
-  /**
-   * Putt frame: zoom to the green inside the safe band between the putt card
-   * (top) and transport chrome (bottom) — full-hole framing still parks the
-   * green under the scrubber on long north→south holes.
-   */
-  function framePuttCamera(green, force) {
-    if (!state.mapAdapter || !green) return;
-    if (!force && state.cameraPadMode === 'putt') return;
-    state.cameraPadMode = 'putt';
-
-    var region =
-      (ReplayEngine.regionFramingPoints &&
-        ReplayEngine.regionFramingPoints([green], {
-          safeInset: 0.1,
-          minLatitudeDelta: 0.0016,
-        })) ||
-      (ReplayEngine.getCameraRegion &&
-        ReplayEngine.getCameraRegion(green, 'close'));
-    if (!region) return;
-
-    var wrap = document.querySelector('.watch-map-wrap');
-    var h = wrap ? wrap.clientHeight : 600;
-    var pad = mapChromePadding({ forPutt: true });
-    // Bias green into the middle of the remaining vertical band.
-    pad.bottom = Math.max(pad.bottom, Math.round(h * 0.34));
-    pad.top = Math.max(pad.top, Math.round(h * 0.3));
-
-    state.mapAdapter.fitRegion(region, {
-      animated: true,
-      padding: pad,
-      maxZoom: 18.25,
+      padding: mapChromePadding(),
     });
   }
 
@@ -710,16 +652,9 @@
         .addTo(state.map);
     }
 
-    // Putt: reframe on the green in the safe band (hole frame keeps green under chrome).
+    // Keep stable full-hole framing; putt chrome is a light top overlay only.
     if (frame.pathKind === 'putt' && frame.puttTracker) {
-      var hole = holeByNumber(holeNumber);
-      var green =
-        (hole && hole.greenPosition) ||
-        frame.position;
       showPuttOverlay(frame.puttTracker);
-      if (green) framePuttCamera(green, false);
-    } else if (state.cameraPadMode === 'putt' && holeNumber != null) {
-      frameHoleCamera(holeNumber, true);
     }
   }
 
@@ -844,14 +779,7 @@
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {
         var seg = currentHoleSeg();
-        if (!seg) return;
-        if (state.cameraPadMode === 'putt') {
-          var hole = holeByNumber(seg.holeNumber);
-          var green = hole && hole.greenPosition;
-          if (green) framePuttCamera(green, true);
-        } else {
-          frameHoleCamera(seg.holeNumber, true, { animated: false });
-        }
+        if (seg) frameHoleCamera(seg.holeNumber, true, { animated: false });
       }, 120);
     });
   }
@@ -863,7 +791,6 @@
     state.controller = ReplayEngine.createReplayController(state.timeline);
     syncFromController();
     state.cameraHoleNumber = null;
-    state.cameraPadMode = null;
     state.lastHoleNumber = null;
 
     var meta = normalized.meta || {};

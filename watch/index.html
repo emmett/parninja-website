@@ -18,7 +18,7 @@
       href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/watch.css?v=32" />
+    <link rel="stylesheet" href="css/watch.css?v=33" />
     <script src="../config.js"></script>
   </head>
   <body>
@@ -43,9 +43,6 @@
             1x
           </button>
         </div>
-        <div class="scorecard-wrap" aria-label="Scorecard">
-          <div class="scorecard" id="scorecard" role="table"></div>
-        </div>
       </header>
 
       <div class="watch-map-wrap">
@@ -62,8 +59,14 @@
           <p>No GPS Data</p>
           <p class="map-empty-sub">Need GPS-tracked shots to create replay</p>
         </div>
+      </div>
 
-        <div class="map-controls-overlay">
+      <footer class="watch-bottom">
+        <div class="scorecard-wrap" aria-label="Scorecard">
+          <div class="scorecard" id="scorecard" role="table"></div>
+        </div>
+
+        <div class="watch-controls">
           <div class="stroke-scrubber" aria-label="Stroke scrubber">
             <p class="scrubber-label" id="scrubber-label">—</p>
             <div class="scrubber-ticks" id="scrubber-ticks"></div>
@@ -88,14 +91,14 @@
             </button>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
 
     <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-    <script src="js/pinLabel.js?v=32"></script>
-    <script src="js/replayEngine.js?v=32"></script>
-    <script src="js/mapLibreAdapter.js?v=32"></script>
-    <script src="js/shareCodec.js?v=32"></script>
-    <script src="js/watch.js?v=32"></script>
+    <script src="js/pinLabel.js?v=33"></script>
+    <script src="js/replayEngine.js?v=33"></script>
+    <script src="js/mapLibreAdapter.js?v=33"></script>
+    <script src="js/shareCodec.js?v=33"></script>
+    <script src="js/watch.js?v=33"></script>
   </body>
 </html>
