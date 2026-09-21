@@ -36,6 +36,7 @@
     mapAdapter: null,
     playTimer: null,
     cameraHoleNumber: null,
+    cameraPadMode: null, // 'hole' | 'putt'
     markers: [],
     ballMarker: null,
     puttMarker: null,
@@ -536,33 +537,59 @@
     return wrap;
   }
 
-  function mapChromePadding(extraTop) {
+  function mapChromePadding(opts) {
+    opts = opts || {};
     var wrap = document.querySelector('.watch-map-wrap');
     var h = wrap ? wrap.clientHeight : 600;
     var w = wrap ? wrap.clientWidth : 400;
-    var inset = ReplayEngine.MAP_VIEWPORT_SAFE_INSET || 0.18;
+    var controls = document.querySelector('.map-controls-overlay');
+    var puttEl = $('putt-overlay');
+    var puttVisible =
+      opts.forPutt ||
+      (puttEl && !puttEl.classList.contains('hidden'));
+
+    // Measure real chrome so green/pins never sit under scrubber + transport.
+    var bottomChrome = controls ? controls.getBoundingClientRect().height : 0;
+    if (bottomChrome < 120) bottomChrome = 150;
+    bottomChrome += 28;
+
+    var topChrome = Math.max(20, Math.round(h * 0.06));
+    if (puttVisible) {
+      // Keep hole geometry under the putt tracker card (safe inset band).
+      topChrome = Math.max(topChrome, Math.round(h * 0.22), 120);
+    }
+    if (opts.extraTop) topChrome = Math.max(topChrome, opts.extraTop);
+
+    var side = Math.max(24, Math.round(w * 0.05));
     return {
-      top: Math.max(extraTop || 24, Math.round(h * inset * 0.5)),
-      bottom: Math.max(150, Math.round(h * inset) + 80),
-      left: Math.max(28, Math.round(w * inset * 0.5)),
-      right: Math.max(28, Math.round(w * inset * 0.5)),
+      top: topChrome,
+      bottom: Math.min(Math.round(h * 0.48), Math.max(160, Math.round(bottomChrome))),
+      left: side,
+      right: side,
     };
   }
 
-  /** Hole frame: tee + green + swing GPS with shared safe-inset region. */
-  function frameHoleCamera(holeNumber, force) {
+  /** Hole frame: tee + green + swing GPS, padded for web chrome. */
+  function frameHoleCamera(holeNumber, force, opts) {
     if (!state.mapAdapter || !state.timeline) return;
-    if (!force && state.cameraHoleNumber === holeNumber) return;
+    opts = opts || {};
+    var mode = opts.forPutt ? 'putt' : 'hole';
+    if (
+      !force &&
+      state.cameraHoleNumber === holeNumber &&
+      state.cameraPadMode === mode
+    ) {
+      return;
+    }
     state.cameraHoleNumber = holeNumber;
+    state.cameraPadMode = mode;
 
     var hole = holeByNumber(holeNumber);
     var region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
     if (!region) return;
-    // App animateToRegion(region) only — region already includes MAP_VIEWPORT_SAFE_INSET.
-    // Extra chrome padding accounts for web scorecard/transport overlays.
     state.mapAdapter.fitRegion(region, {
-      animated: true,
-      padding: mapChromePadding(24),
+      animated: opts.animated !== false,
+      padding: mapChromePadding({ forPutt: !!opts.forPutt }),
     });
   }
 
@@ -652,9 +679,14 @@
         .addTo(state.map);
     }
 
-    // Match app: keep hole framing during putts; putt chrome is a screen overlay.
+    // Keep hole framing, but pad for putt card + bottom transport so green stays clear.
     if (frame.pathKind === 'putt' && frame.puttTracker) {
       showPuttOverlay(frame.puttTracker);
+      if (holeNumber != null) {
+        frameHoleCamera(holeNumber, false, { forPutt: true });
+      }
+    } else if (state.cameraPadMode === 'putt' && holeNumber != null) {
+      frameHoleCamera(holeNumber, true, { forPutt: false });
     }
   }
 
@@ -773,8 +805,19 @@
       map.resize();
       if (cb) cb();
     });
+    var resizeTimer = null;
     window.addEventListener('resize', function () {
       if (state.map) state.map.resize();
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        var seg = currentHoleSeg();
+        if (seg) {
+          frameHoleCamera(seg.holeNumber, true, {
+            forPutt: state.cameraPadMode === 'putt',
+            animated: false,
+          });
+        }
+      }, 120);
     });
   }
 
@@ -785,6 +828,7 @@
     state.controller = ReplayEngine.createReplayController(state.timeline);
     syncFromController();
     state.cameraHoleNumber = null;
+    state.cameraPadMode = null;
     state.lastHoleNumber = null;
 
     var meta = normalized.meta || {};
