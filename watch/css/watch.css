@@ -121,11 +121,11 @@ body {
   filter: brightness(0.97);
 }
 
-/* Fluid front/back scorecard — fills width on phone, caps on laptop. */
+/* Compact front/back scorecard for the bottom dock */
 .scorecard-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.25rem 0.4rem 0.2rem;
+  padding: 0.12rem 0.35rem 0.08rem;
   scrollbar-width: none;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -139,17 +139,18 @@ body {
   flex-direction: column;
   gap: 0;
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
   margin: 0 auto;
 }
 
 .scorecard-row {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(34px, 0.95fr);
+  grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(30px, 0.9fr);
   align-items: stretch;
   gap: 0;
   border-bottom: 1px solid #e5e7eb;
-  padding: 1px 0;
+  padding: 0;
+  line-height: 1.05;
 }
 
 .scorecard-row:last-child {
@@ -161,7 +162,7 @@ body {
   min-width: 0;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 1px 0;
   cursor: pointer;
   font: inherit;
@@ -182,10 +183,10 @@ body {
 
 .scorecard-cell .hole-num {
   display: block;
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   color: #333;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .scorecard-cell.active .hole-num {
@@ -194,9 +195,9 @@ body {
 
 .scorecard-cell .hole-par {
   display: block;
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
   color: #666;
-  line-height: 1.15;
+  line-height: 1;
   margin-top: 0;
 }
 
@@ -205,15 +206,16 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
-  min-height: 1.75rem;
+  margin-top: 0;
+  min-height: 0;
+  gap: 0;
 }
 
 .scorecard-cell .score-val {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1;
   color: #111;
@@ -227,20 +229,17 @@ body {
   color: var(--bogey);
 }
 
-.scorecard-cell .hole-putts {
-  display: block;
-  font-size: 0.5625rem;
-  color: #666;
-  line-height: 1.1;
-  margin-top: 0;
+.scorecard-cell .hole-putts,
+.scorecard-total .total-putts {
+  display: none;
 }
 
 .score-shape {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.05rem;
-  height: 1.05rem;
+  min-width: 0.95rem;
+  height: 0.95rem;
   padding: 0 1px;
   font-size: inherit;
 }
@@ -252,13 +251,13 @@ body {
 
 .score-shape.square {
   border: 1.5px solid currentColor;
-  border-radius: 3px;
+  border-radius: 2px;
   background: #fff3e0;
 }
 
 .score-shape.double-square {
   border: 1.5px solid currentColor;
-  border-radius: 3px;
+  border-radius: 2px;
   box-shadow: inset 0 0 0 1.5px currentColor;
   background: #ffebee;
   padding: 0 2px;
@@ -271,48 +270,42 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 1px 0 1px 3px;
+  padding: 1px 0 1px 2px;
   border-left: 1px solid #e5e7eb;
   margin-left: 1px;
+  gap: 0;
 }
 
 .scorecard-total .total-label {
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
   font-weight: 700;
   color: #333;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  line-height: 1.1;
-}
-
-.scorecard-total .total-par {
-  font-size: 0.5625rem;
-  color: #666;
-  margin-top: 0;
-  line-height: 1.15;
-}
-
-.scorecard-total .total-score {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #111;
-  margin-top: 3px;
   line-height: 1;
 }
 
-.scorecard-total .total-putts {
-  font-size: 0.5625rem;
+.scorecard-total .total-par {
+  font-size: 0.5rem;
   color: #666;
   margin-top: 0;
-  line-height: 1.1;
+  line-height: 1;
+}
+
+.scorecard-total .total-score {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #111;
+  margin-top: 1px;
+  line-height: 1;
 }
 
 .scorecard-total .total-net {
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   color: #333;
-  margin-top: 1px;
-  line-height: 1.1;
+  margin-top: 0;
+  line-height: 1;
 }
 
 .scorecard-total .total-net.over {
@@ -387,25 +380,19 @@ body {
   }
 
   .scorecard-wrap {
-    padding: 0.25rem 1rem 0.45rem;
+    padding: 0.15rem 0.75rem 0.1rem;
   }
 
   .scorecard {
-    max-width: 640px;
+    max-width: 560px;
   }
 
   .scorecard-row {
-    grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(42px, 0.9fr);
-    padding: 3px 0;
-  }
-
-  .scorecard-cell {
-    border-radius: 8px;
-    padding: 2px 1px;
+    grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(34px, 0.9fr);
   }
 
   .scorecard-cell .hole-num {
-    font-size: 0.75rem;
+    font-size: 0.625rem;
   }
 
   .scorecard-cell .hole-par,
@@ -413,32 +400,27 @@ body {
   .scorecard-total .total-par,
   .scorecard-total .total-putts,
   .scorecard-total .total-label {
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
   .scorecard-cell .score-val,
   .scorecard-total .total-score {
-    font-size: 0.875rem;
-  }
-
-  .scorecard-cell .score-stack {
-    min-height: 2.1rem;
-    margin-top: 2px;
+    font-size: 0.75rem;
   }
 
   .score-shape {
-    min-width: 1.2rem;
-    height: 1.2rem;
+    min-width: 1.05rem;
+    height: 1.05rem;
   }
 
   .scorecard-total .total-net {
-    font-size: 0.75rem;
+    font-size: 0.625rem;
   }
 }
 
 @media (min-width: 960px) {
   .scorecard {
-    max-width: 720px;
+    max-width: 600px;
   }
 }
 
@@ -557,8 +539,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 0.35rem 0.65rem 0.55rem;
+  gap: 4px;
+  padding: 0.25rem 0.65rem 0.4rem;
 }
 
 .map-empty {

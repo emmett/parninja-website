@@ -540,30 +540,90 @@
     var wrap = document.querySelector('.watch-map-wrap');
     var h = wrap ? wrap.clientHeight : 600;
     var w = wrap ? wrap.clientWidth : 400;
-    // Chrome is outside the map — light pad for yards / putt card only.
-    var side = Math.max(20, Math.round(w * 0.05));
+    var side = Math.max(16, Math.round(w * 0.04));
+    // Extra bottom: green GPS is often on the front of the putting surface.
     return {
-      top: Math.max(28, Math.round(h * 0.1)),
-      bottom: Math.max(24, Math.round(h * 0.06)),
+      top: Math.max(14, Math.round(h * 0.05)),
+      bottom: Math.max(44, Math.round(h * 0.15)),
       left: side,
       right: side,
     };
   }
 
+  /** Ensure tee/green anchors exist for framing (v2 pack often omits green). */
+  function holeWithAnchors(hole) {
+    if (!hole) return hole;
+    if (hole.greenPosition) return hole;
+    if (!hole.strokes || !hole.strokes.length) return hole;
+    var green = null;
+    for (var i = hole.strokes.length - 1; i >= 0; i--) {
+      var s = hole.strokes[i];
+      if (
+        s &&
+        s.position &&
+        Number.isFinite(s.position.latitude) &&
+        (s.club === 'PU' || s.lie === 'Green')
+      ) {
+        green = {
+          latitude: s.position.latitude,
+          longitude: s.position.longitude,
+        };
+        break;
+      }
+    }
+    if (!green) {
+      for (var j = hole.strokes.length - 1; j >= 0; j--) {
+        var s2 = hole.strokes[j];
+        if (s2 && s2.position && Number.isFinite(s2.position.latitude)) {
+          green = {
+            latitude: s2.position.latitude,
+            longitude: s2.position.longitude,
+          };
+          break;
+        }
+      }
+    }
+    return green ? Object.assign({}, hole, { greenPosition: green }) : hole;
+  }
+
   /** Hole frame: tee + green + swing GPS (stable full-hole zoom). */
   function frameHoleCamera(holeNumber, force, opts) {
-    if (!state.mapAdapter || !state.timeline) return;
+    if (!state.mapAdapter || !state.map || !state.timeline) return;
     opts = opts || {};
     if (!force && state.cameraHoleNumber === holeNumber) return;
     state.cameraHoleNumber = holeNumber;
 
-    var hole = holeByNumber(holeNumber);
-    var region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
+    state.map.resize();
+
+    var hole = holeWithAnchors(holeByNumber(holeNumber));
+    var region = null;
+    if (ReplayEngine.regionFramingPoints && hole) {
+      var pts = [];
+      if (hole.teePosition) pts.push(hole.teePosition);
+      if (hole.greenPosition) pts.push(hole.greenPosition);
+      state.timeline.frames.forEach(function (f) {
+        if (f.holeNumber !== holeNumber || f.pathKind === 'walk') return;
+        if (f.position) pts.push(f.position);
+      });
+      region = ReplayEngine.regionFramingPoints(pts, {
+        safeInset: 0.22,
+        minLatitudeDelta: 0.0028,
+      });
+    }
+    if (!region) {
+      region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
+    }
     if (!region) return;
     state.mapAdapter.fitRegion(region, {
       animated: opts.animated !== false,
       padding: mapChromePadding(),
     });
+  }
+
+  function scheduleReframe(animated) {
+    var seg = currentHoleSeg();
+    if (!seg) return;
+    frameHoleCamera(seg.holeNumber, true, { animated: animated !== false });
   }
 
   function showPuttOverlay(tracker) {
@@ -586,8 +646,11 @@
         state.mapAdapter.clearHoleOverlays();
       }
       state.lastHoleNumber = holeNumber;
-      frameHoleCamera(holeNumber, true);
       renderScorecard();
+      // Scorecard height affects map box — frame after layout.
+      requestAnimationFrame(function () {
+        frameHoleCamera(holeNumber, true);
+      });
     }
 
     updateHeader();
@@ -773,15 +836,32 @@
       map.resize();
       if (cb) cb();
     });
+
+    // Dock layout changes map height — reframe so tee→green stays in view.
     var resizeTimer = null;
-    window.addEventListener('resize', function () {
+    function onMapBoxChange() {
       if (state.map) state.map.resize();
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(function () {
-        var seg = currentHoleSeg();
-        if (seg) frameHoleCamera(seg.holeNumber, true, { animated: false });
-      }, 120);
-    });
+        scheduleReframe(false);
+      }, 80);
+    }
+    window.addEventListener('resize', onMapBoxChange);
+    if (typeof ResizeObserver !== 'undefined') {
+      var wrap = document.querySelector('.watch-map-wrap');
+      if (wrap) {
+        var lastH = 0;
+        var ro = new ResizeObserver(function (entries) {
+          var h = entries[0] && entries[0].contentRect
+            ? entries[0].contentRect.height
+            : 0;
+          if (Math.abs(h - lastH) < 2) return;
+          lastH = h;
+          onMapBoxChange();
+        });
+        ro.observe(wrap);
+      }
+    }
   }
 
   function boot(doc) {
@@ -822,8 +902,12 @@
     function start() {
       renderScorecard();
       renderFrame();
-      var firstSeg = state.timeline.holes[0];
-      if (firstSeg) frameHoleCamera(firstSeg.holeNumber, true);
+      // Scorecard dock settles map height — reframe after layout.
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          scheduleReframe(false);
+        });
+      });
     }
 
     if (state.map && state.map.loaded()) start();

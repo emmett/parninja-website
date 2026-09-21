@@ -685,6 +685,26 @@
           }
         }
       }
+      if (!hole.greenPosition) {
+        for (let i = strokes.length - 1; i >= 0; i--) {
+          const s = strokes[i];
+          const p = s.position;
+          if (!p || p.latitude == null || p.longitude == null) continue;
+          if (s.club === "PU" || s.lie === "Green") {
+            hole.greenPosition = { latitude: p.latitude, longitude: p.longitude };
+            break;
+          }
+        }
+        if (!hole.greenPosition) {
+          for (let i = strokes.length - 1; i >= 0; i--) {
+            const p = strokes[i].position;
+            if (p && p.latitude != null && p.longitude != null) {
+              hole.greenPosition = { latitude: p.latitude, longitude: p.longitude };
+              break;
+            }
+          }
+        }
+      }
       return hole;
     });
     return { ...doc, holes };
