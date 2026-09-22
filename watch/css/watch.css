@@ -598,6 +598,7 @@ body {
 }
 
 .scrubber-tick {
+  position: relative;
   min-width: 26px;
   height: 26px;
   padding: 0 6px;
@@ -701,11 +702,15 @@ body {
   margin: -5px 0 0 -5px;
 }
 
-.pin-pill {
+.pin-pill-wrap {
   position: absolute;
   left: 0;
   top: 0;
   transform: translate(-50%, -50%) translate(var(--pin-ox, 0px), var(--pin-oy, -34px));
+}
+
+.pin-pill {
+  position: relative;
   padding: 6px 10px;
   border-radius: 12px;
   min-width: 44px;
@@ -726,6 +731,31 @@ body {
 
 .pin-pill.selected {
   background: #c62828 !important;
+}
+
+.penalty-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: #dc2626;
+  border: 1.5px solid #fff;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.scrubber-tick .penalty-badge {
+  top: -4px;
+  right: -4px;
 }
 
 .ball-marker {

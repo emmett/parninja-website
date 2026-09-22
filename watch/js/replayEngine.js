@@ -207,6 +207,11 @@
     }
     return clubLabel;
   }
+  function strokePenalty(stroke) {
+    var _a;
+    const n = Math.round((_a = stroke.penalty) != null ? _a : 0);
+    return Number.isFinite(n) && n > 0 ? n : void 0;
+  }
   function interpolateFlightPath(start, end, progress, _arcHeight = 0.3) {
     const lat = start.latitude + (end.latitude - start.latitude) * progress;
     const lng = start.longitude + (end.longitude - start.longitude) * progress;
@@ -249,44 +254,100 @@
     const secondFeet = puttCount <= 1 ? 0 : Math.max(0, Math.round(lastYards * 3));
     return { firstFeet, secondFeet, puttCount, maxFeet: puttTrackerMaxFeet(firstFeet) };
   }
-  function appendPuttReplayFrames(args) {
-    var _a, _b, _c;
-    const { frames, hole, puttStroke, strokeNumber, config } = args;
-    let currentTime = args.startTime;
-    const holdPos = (_c = ((_a = puttStroke.position) == null ? void 0 : _a.latitude) && ((_b = puttStroke.position) == null ? void 0 : _b.longitude) ? puttStroke.position : null) != null ? _c : getHoleGreen(hole);
-    if (!holdPos) return currentTime;
-    const { firstFeet, secondFeet, puttCount, maxFeet } = buildPuttTrackerDistances(puttStroke);
-    const pinLabel = formatReplayPinLabel(puttStroke, null);
-    const strokeDuration = config.msPerStroke / config.speedMultiplier;
-    const trackFrames = Math.max(2, config.flightFramesPerStroke);
-    const resultFrames = Math.max(2, Math.round(config.flightFramesPerStroke / 2));
-    for (let i = 0; i <= trackFrames; i++) {
-      const t = i / trackFrames;
-      const currentFeet = firstFeet + (secondFeet - firstFeet) * t;
+  function appendPuttTrackFrames(args) {
+    const {
+      frames,
+      hole,
+      puttStroke,
+      strokeNumber,
+      startTime,
+      duration,
+      frameCount,
+      fromFeet,
+      toFeet,
+      distances,
+      pinLabel,
+      penalty,
+      holdPos,
+      phase
+    } = args;
+    for (let i = 0; i <= frameCount; i++) {
+      const t = i / frameCount;
+      const currentFeet = fromFeet + (toFeet - fromFeet) * t;
       frames.push({
-        timestamp: currentTime + strokeDuration * t,
+        timestamp: startTime + duration * t,
         position: holdPos,
         strokeNumber,
         holeNumber: hole.holeNumber,
         club: puttStroke.club || "PU",
         distance: currentFeet / 3,
         sg: puttStroke.SGA,
-        event: i === 0 ? "putt" : i === trackFrames ? "land" : "flight",
-        isKeyFrame: i === 0,
+        event: i === 0 && phase === "track" ? "putt" : i === frameCount ? "land" : "flight",
+        isKeyFrame: i === 0 && phase === "track",
         pathKind: "putt",
         lie: puttStroke.lie,
         pinLabel,
+        penalty,
         puttTracker: {
-          maxFeet,
-          firstFeet,
-          secondFeet,
-          puttCount,
+          maxFeet: distances.maxFeet,
+          firstFeet: distances.firstFeet,
+          secondFeet: distances.secondFeet,
+          puttCount: distances.puttCount,
           currentFeet,
-          phase: "track"
+          phase
         }
       });
     }
-    currentTime += strokeDuration;
+    return startTime + duration;
+  }
+  function appendPuttReplayFrames(args) {
+    var _a, _b, _c;
+    const { frames, hole, puttStroke, strokeNumber, config } = args;
+    let currentTime = args.startTime;
+    const holdPos = (_c = ((_a = puttStroke.position) == null ? void 0 : _a.latitude) && ((_b = puttStroke.position) == null ? void 0 : _b.longitude) ? puttStroke.position : null) != null ? _c : getHoleGreen(hole);
+    if (!holdPos) return currentTime;
+    const distances = buildPuttTrackerDistances(puttStroke);
+    const { firstFeet, secondFeet, puttCount } = distances;
+    const pinLabel = formatReplayPinLabel(puttStroke, null);
+    const penalty = strokePenalty(puttStroke);
+    const strokeDuration = config.msPerStroke / config.speedMultiplier;
+    const trackFrames = Math.max(2, config.flightFramesPerStroke);
+    const resultFrames = Math.max(2, Math.round(config.flightFramesPerStroke / 2));
+    const firstEndFeet = puttCount <= 1 ? 0 : secondFeet;
+    currentTime = appendPuttTrackFrames({
+      frames,
+      hole,
+      puttStroke,
+      strokeNumber,
+      startTime: currentTime,
+      duration: strokeDuration,
+      frameCount: trackFrames,
+      fromFeet: firstFeet,
+      toFeet: firstEndFeet,
+      distances,
+      pinLabel,
+      penalty,
+      holdPos,
+      phase: "track"
+    });
+    if (puttCount > 1 && secondFeet > 0) {
+      currentTime = appendPuttTrackFrames({
+        frames,
+        hole,
+        puttStroke,
+        strokeNumber,
+        startTime: currentTime,
+        duration: strokeDuration,
+        frameCount: trackFrames,
+        fromFeet: secondFeet,
+        toFeet: 0,
+        distances,
+        pinLabel,
+        penalty,
+        holdPos,
+        phase: "trackSecond"
+      });
+    }
     const resultDuration = strokeDuration * 0.5;
     for (let i = 0; i <= resultFrames; i++) {
       const t = i / resultFrames;
@@ -296,19 +357,20 @@
         strokeNumber,
         holeNumber: hole.holeNumber,
         club: puttStroke.club || "PU",
-        distance: secondFeet / 3,
+        distance: 0,
         sg: puttStroke.SGA,
         event: "land",
         isKeyFrame: false,
         pathKind: "putt",
         lie: puttStroke.lie,
         pinLabel,
+        penalty,
         puttTracker: {
-          maxFeet,
+          maxFeet: distances.maxFeet,
           firstFeet,
           secondFeet,
           puttCount,
-          currentFeet: secondFeet,
+          currentFeet: 0,
           phase: "result"
         }
       });
@@ -358,7 +420,8 @@
           {
             lie: stroke.lie,
             shotDistanceYards: shotYards2,
-            pinLabel: formatReplayPinLabel(stroke, shotYards2)
+            pinLabel: formatReplayPinLabel(stroke, shotYards2),
+            penalty: strokePenalty(stroke)
           }
         );
         frames.push(...strokeFrames2);
@@ -382,7 +445,8 @@
         {
           lie: stroke.lie,
           shotDistanceYards: shotYards,
-          pinLabel: formatReplayPinLabel(stroke, shotYards)
+          pinLabel: formatReplayPinLabel(stroke, shotYards),
+          penalty: strokePenalty(stroke)
         }
       );
       frames.push(...strokeFrames);
@@ -411,7 +475,8 @@
         isKeyFrame: true,
         pathKind: "swing",
         lie: lastStroke.lie,
-        pinLabel: formatReplayPinLabel(lastStroke, null)
+        pinLabel: formatReplayPinLabel(lastStroke, null),
+        penalty: strokePenalty(lastStroke)
       });
     }
     const holeSegment = {
@@ -564,7 +629,7 @@
     }
     return times;
   }
-  function getHoleCameraRegion(timeline, holeNumber, hole) {
+  function getHoleCameraRegion(timeline, holeNumber, hole, options) {
     const pts = [];
     if (hole) {
       if (hole.teePosition) pts.push(hole.teePosition);
@@ -583,7 +648,7 @@
       if (frame.pathKind === "walk") continue;
       pts.push(frame.position);
     }
-    return regionFramingPoints(pts);
+    return regionFramingPoints(pts, options);
   }
   function getNextStrokeTime(timeline, currentTime) {
     const starts = getStrokeStartTimes(timeline);

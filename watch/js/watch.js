@@ -351,12 +351,39 @@
     var ticks = $('scrubber-ticks');
     ticks.innerHTML = '';
     scrubber.strokeTimes.forEach(function (t, i) {
+      var tickFrame = state.timeline
+        ? ReplayEngine.getFrameAtTime(state.timeline, t)
+        : null;
+      var isPutt = tickFrame && tickFrame.pathKind === 'putt';
+      var tickLabel = isPutt ? 'PU' : String(i + 1);
+      var penalty =
+        tickFrame && tickFrame.penalty > 0 ? Math.round(tickFrame.penalty) : 0;
+
       var b = document.createElement('button');
       b.type = 'button';
       b.className =
         'scrubber-tick' + (i === scrubber.activeStrokeIndex ? ' active' : '');
-      b.textContent = String(i + 1);
-      b.setAttribute('aria-label', 'Shot ' + (i + 1));
+      b.textContent = tickLabel;
+      if (penalty > 0) {
+        var badge = document.createElement('span');
+        badge.className = 'penalty-badge';
+        badge.textContent = '+' + penalty;
+        badge.setAttribute('aria-hidden', 'true');
+        b.appendChild(badge);
+      }
+      b.setAttribute(
+        'aria-label',
+        penalty > 0
+          ? 'Shot ' +
+              (i + 1) +
+              ', ' +
+              penalty +
+              ' penalty stroke' +
+              (penalty === 1 ? '' : 's')
+          : isPutt
+            ? 'Putting'
+            : 'Shot ' + (i + 1)
+      );
       b.setAttribute(
         'aria-pressed',
         i === scrubber.activeStrokeIndex ? 'true' : 'false'
@@ -434,25 +461,38 @@
     });
   }
 
-  function makePinElement(label, lie, selected, offsetSide) {
+  function makePinElement(label, lie, selected, offsetSide, penalty) {
     var stack = document.createElement('div');
     stack.className = 'pin-stack' + (selected ? ' selected' : '');
 
     var dot = document.createElement('div');
     dot.className = 'pin-dot';
 
+    var pillWrap = document.createElement('div');
+    pillWrap.className = 'pin-pill-wrap';
+
     var pill = document.createElement('div');
     pill.className = 'pin-pill' + (selected ? ' selected' : '');
     if (lie === 'Sand' && !selected) pill.classList.add('sand');
     if (!selected) pill.style.backgroundColor = PinLabel.lieColor(lie);
     pill.textContent = label;
+    pillWrap.appendChild(pill);
+
+    var penaltyCount = Math.round(penalty || 0);
+    if (penaltyCount > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'penalty-badge pin-penalty';
+      badge.textContent = '+' + penaltyCount;
+      badge.setAttribute('aria-hidden', 'true');
+      pillWrap.appendChild(badge);
+    }
 
     var px = PinLabel.pinOffsetPixels(offsetSide || 'up');
     stack.style.setProperty('--pin-ox', px[0] + 'px');
     stack.style.setProperty('--pin-oy', px[1] + 'px');
 
     stack.appendChild(dot);
-    stack.appendChild(pill);
+    stack.appendChild(pillWrap);
     return stack;
   }
 
@@ -519,7 +559,7 @@
         "'</div><div class=\"putt-frame-point\"></div>";
       track.appendChild(f2);
     }
-    if (tracker.phase === 'track') {
+    if (tracker.phase === 'track' || tracker.phase === 'trackSecond') {
       var dot = document.createElement('div');
       dot.className = 'putt-dot';
       dot.style.left = clamp(tracker.currentFeet) * 100 + '%';
@@ -540,53 +580,19 @@
     var wrap = document.querySelector('.watch-map-wrap');
     var h = wrap ? wrap.clientHeight : 600;
     var w = wrap ? wrap.clientWidth : 400;
-    var side = Math.max(16, Math.round(w * 0.04));
-    // Extra bottom: green GPS is often on the front of the putting surface.
+    // Chrome is off-map; region uses safeInset 0.08. Light pad for yards/putt card only.
+    var side = Math.max(12, Math.round(w * 0.03));
     return {
-      top: Math.max(14, Math.round(h * 0.05)),
-      bottom: Math.max(44, Math.round(h * 0.15)),
+      top: Math.max(12, Math.round(h * 0.04)),
+      bottom: Math.max(12, Math.round(h * 0.04)),
       left: side,
       right: side,
     };
   }
 
-  /** Ensure tee/green anchors exist for framing (v2 pack often omits green). */
-  function holeWithAnchors(hole) {
-    if (!hole) return hole;
-    if (hole.greenPosition) return hole;
-    if (!hole.strokes || !hole.strokes.length) return hole;
-    var green = null;
-    for (var i = hole.strokes.length - 1; i >= 0; i--) {
-      var s = hole.strokes[i];
-      if (
-        s &&
-        s.position &&
-        Number.isFinite(s.position.latitude) &&
-        (s.club === 'PU' || s.lie === 'Green')
-      ) {
-        green = {
-          latitude: s.position.latitude,
-          longitude: s.position.longitude,
-        };
-        break;
-      }
-    }
-    if (!green) {
-      for (var j = hole.strokes.length - 1; j >= 0; j--) {
-        var s2 = hole.strokes[j];
-        if (s2 && s2.position && Number.isFinite(s2.position.latitude)) {
-          green = {
-            latitude: s2.position.latitude,
-            longitude: s2.position.longitude,
-          };
-          break;
-        }
-      }
-    }
-    return green ? Object.assign({}, hole, { greenPosition: green }) : hole;
-  }
+  /** Hole frame: tee + green + swing GPS. Replay chrome is off-map → inset 0.08. */
+  var REPLAY_MAP_SAFE_INSET = 0.08;
 
-  /** Hole frame: tee + green + swing GPS (stable full-hole zoom). */
   function frameHoleCamera(holeNumber, force, opts) {
     if (!state.mapAdapter || !state.map || !state.timeline) return;
     opts = opts || {};
@@ -595,24 +601,13 @@
 
     state.map.resize();
 
-    var hole = holeWithAnchors(holeByNumber(holeNumber));
-    var region = null;
-    if (ReplayEngine.regionFramingPoints && hole) {
-      var pts = [];
-      if (hole.teePosition) pts.push(hole.teePosition);
-      if (hole.greenPosition) pts.push(hole.greenPosition);
-      state.timeline.frames.forEach(function (f) {
-        if (f.holeNumber !== holeNumber || f.pathKind === 'walk') return;
-        if (f.position) pts.push(f.position);
-      });
-      region = ReplayEngine.regionFramingPoints(pts, {
-        safeInset: 0.22,
-        minLatitudeDelta: 0.0028,
-      });
-    }
-    if (!region) {
-      region = ReplayEngine.getHoleCameraRegion(state.timeline, holeNumber, hole);
-    }
+    var hole = holeByNumber(holeNumber);
+    var region = ReplayEngine.getHoleCameraRegion(
+      state.timeline,
+      holeNumber,
+      hole,
+      { safeInset: REPLAY_MAP_SAFE_INSET }
+    );
     if (!region) return;
     state.mapAdapter.fitRegion(region, {
       animated: opts.animated !== false,
@@ -692,7 +687,8 @@
         pin.pinLabel || pin.club || '',
         pin.lie,
         selected,
-        offsets[i]
+        offsets[i],
+        pin.penalty
       );
       var marker = new maplibregl.Marker({
         element: el,
@@ -837,11 +833,13 @@
       if (cb) cb();
     });
 
-    // Dock layout changes map height — reframe so tee→green stays in view.
+    // Dock layout changes map height — resize canvas only (refit on hole change).
     var resizeTimer = null;
     function onMapBoxChange() {
       if (state.map) state.map.resize();
       clearTimeout(resizeTimer);
+      // One soft reframe after layout settles so first paint / rotate stays framed.
+      // Contract: primary refit is hole change; this is web dock / orientation only.
       resizeTimer = setTimeout(function () {
         scheduleReframe(false);
       }, 80);
