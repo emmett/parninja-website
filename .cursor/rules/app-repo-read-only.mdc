@@ -1,0 +1,18 @@
+---
+description: The ParNinja app repo is read-only from the website repo
+alwaysApply: true
+---
+
+# App repo is read-only
+
+This workspace (`parninja-website`) only commits and pushes to `parninja-website`.
+
+The app repo (`../parninja`, its worktrees such as `../parninja-replay-share` and `../parninja-wt/*`, and `github.com/emmett/parninja`) may be **read** for reference — source, tests, git history, branches, PRs — but never modified:
+
+- Do not edit, create, or delete files there (including build output like `packages/replay/dist`).
+- Do not run app scripts that write into the app tree (e.g. `npm run build:watch-replay`).
+- Do not stage, commit, branch, stash, checkout, push, or open/close/comment on PRs in the app repo.
+
+To pick up `@parninja/replay` changes, run `scripts/build-replay-engine.sh [ref]`; it exports committed app source via `git archive` into a temp dir and writes only `watch/js/replayEngine.js`.
+
+If a web change needs an app change (e.g. a new share-pack field), make the web side tolerant of the field being absent, and tell the user what the app needs to send instead of changing the app.

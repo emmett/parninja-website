@@ -91,7 +91,7 @@ Production (after deploy): `https://parninja.com/watch/` and `https://parninja.c
 
 `#r=` blobs are decoded client-side by `watch/js/shareCodec.js` (gzip or raw DEFLATE → JSON / compact → boot).
 
-The player matches the in-app **TF 192 screen-player contract** via shared **`@parninja/replay`** (engine + controller + tokens), with chrome/transport/yards/pins aligned to `RoundReplayPlayer`. Source of truth: `parninja/packages/replay`. `/watch` loads a generated IIFE (`watch/js/replayEngine.js`) — rebuild with `scripts/build-replay-engine.sh` or from the app: `npm run build:watch-replay`. Encode stays parked.
+The player matches the in-app **TF 192 screen-player contract** via shared **`@parninja/replay`** (engine + controller + tokens), with chrome/transport/yards/pins aligned to `RoundReplayPlayer`. Source of truth: `parninja/packages/replay`. `/watch` loads a generated IIFE (`watch/js/replayEngine.js`) — rebuild with `scripts/build-replay-engine.sh [ref]`, which exports the app's committed `packages/replay` (default `origin/main`) to a temp dir and bundles it there. The app repo is read-only from this repo: never edit, commit, or push to it from here. Encode stays parked.
 
 **Intentional diffs vs native:** Esri World Imagery basemap (app uses Apple/Google mutedStandard + stylized greens); brand icon opens App Store (no in-app deeplink yet); scorecard + transport docked below the map (app overlays chrome on the map); no modal close chrome.
 

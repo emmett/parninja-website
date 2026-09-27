@@ -1,9 +1,7 @@
 /**
  * @parninja/replay — GENERATED FILE. Do not edit by hand.
- * Source: packages/replay (app repo). Rebuild: npm run build:watch-replay
+ * Source: packages/replay (app repo @ d35c94f3). Rebuild: scripts/build-replay-engine.sh
  */
-
-"use strict";
 (() => {
   var __defProp = Object.defineProperty;
   var __export = (target, all) => {
@@ -843,9 +841,7 @@
     }
     const isPutting = (frame == null ? void 0 : frame.pathKind) === "putt";
     let label = "\u2014";
-    if ((frame == null ? void 0 : frame.event) === "blowup") {
-      label = "Blowup";
-    } else if (isPutting && (frame == null ? void 0 : frame.puttTracker)) {
+    if (isPutting && (frame == null ? void 0 : frame.puttTracker)) {
       const n = frame.puttTracker.puttCount;
       if (frame.puttTracker.phase === "result") {
         label = `${n} putt${n === 1 ? "" : "s"}`;

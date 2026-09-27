@@ -390,7 +390,12 @@
       strokeTimes: [],
       activeStrokeIndex: -1,
     };
-    $('scrubber-label').textContent = scrubber.label;
+    var labelFrame = state.timeline
+      ? ReplayEngine.getFrameAtTime(state.timeline, state.currentTime)
+      : null;
+    // RoundReplayPlayer labels the blowup hold inline; the shared view-model doesn't.
+    $('scrubber-label').textContent =
+      labelFrame && labelFrame.event === 'blowup' ? 'Blowup' : scrubber.label;
 
     var ticks = $('scrubber-ticks');
     ticks.innerHTML = '';
