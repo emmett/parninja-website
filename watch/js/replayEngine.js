@@ -14,16 +14,21 @@
   // packages/replay/src/index.ts
   var index_exports = {};
   __export(index_exports, {
+    BLOWUP_ANIMATION_MS: () => BLOWUP_ANIMATION_MS,
     DEFAULT_REPLAY_CONFIG: () => DEFAULT_REPLAY_CONFIG,
     FRAME_MS: () => FRAME_MS,
     HOLE_PATH_POLYLINE: () => HOLE_PATH_POLYLINE,
     MAP_VIEWPORT_SAFE_INSET: () => MAP_VIEWPORT_SAFE_INSET,
     MIN_LATITUDE_DELTA: () => MIN_LATITUDE_DELTA,
     PLAYBACK_SPEEDS: () => PLAYBACK_SPEEDS,
+    PUTT_TAP_IN_BEAT_MS: () => PUTT_TAP_IN_BEAT_MS,
+    PUTT_TAP_IN_FEET: () => PUTT_TAP_IN_FEET,
+    PUTT_TRACKER_MIN_MAX_FEET: () => PUTT_TRACKER_MIN_MAX_FEET,
     PUTT_TRACKER_SCALE: () => PUTT_TRACKER_SCALE,
     STYLIZED_LANDSCAPE: () => STYLIZED_LANDSCAPE,
     applyFrameToMapAdapter: () => applyFrameToMapAdapter,
     buildHoleReplayTimeline: () => buildHoleReplayTimeline,
+    buildPuttLegs: () => buildPuttLegs,
     buildPuttTrackerDistances: () => buildPuttTrackerDistances,
     buildRoundReplayTimeline: () => buildRoundReplayTimeline,
     buildScrubberViewModel: () => buildScrubberViewModel,
@@ -57,9 +62,12 @@
 
   // packages/replay/src/tokens.ts
   var PUTT_TRACKER_SCALE = 1.5;
+  var PUTT_TRACKER_MIN_MAX_FEET = 10;
+  var PUTT_TAP_IN_FEET = 1;
+  var PUTT_TAP_IN_BEAT_MS = 750;
   function puttTrackerMaxFeet(firstFeet) {
     const first = Math.max(0, firstFeet);
-    return Math.max(1, Math.round(first * PUTT_TRACKER_SCALE));
+    return Math.max(PUTT_TRACKER_MIN_MAX_FEET, Math.round(first * PUTT_TRACKER_SCALE));
   }
   var MAP_VIEWPORT_SAFE_INSET = 0.18;
   var MIN_LATITUDE_DELTA = 25e-4;
@@ -81,11 +89,13 @@
     park: "#9ccb7a",
     active: "#14532d"
   };
+  var BLOWUP_ANIMATION_MS = 1680;
   var DEFAULT_REPLAY_CONFIG = {
     speedMultiplier: 1,
     msPerStroke: 2e3,
     msPerHoleTransition: 1500,
-    flightFramesPerStroke: 10
+    flightFramesPerStroke: 10,
+    msBlowupHold: BLOWUP_ANIMATION_MS
   };
 
   // packages/replay/src/gps.ts
@@ -124,14 +134,16 @@
 
   // packages/replay/src/framing.ts
   function regionFramingPoints(points, options) {
-    var _a, _b;
+    var _a, _b, _c;
     const valid = points.filter(
       (p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180
     );
     if (valid.length === 0) return null;
-    const safeInset = (_a = options == null ? void 0 : options.safeInset) != null ? _a : MAP_VIEWPORT_SAFE_INSET;
-    const usable = Math.max(0.2, 1 - 2 * Math.max(0, Math.min(0.4, safeInset)));
-    const minDelta = (_b = options == null ? void 0 : options.minLatitudeDelta) != null ? _b : MIN_LATITUDE_DELTA;
+    const safeInset = Math.max(0, Math.min(0.4, (_a = options == null ? void 0 : options.safeInset) != null ? _a : MAP_VIEWPORT_SAFE_INSET));
+    const safeInsetTop = Math.max(safeInset, Math.min(0.6, (_b = options == null ? void 0 : options.safeInsetTop) != null ? _b : safeInset));
+    const usable = Math.max(0.2, 1 - 2 * safeInset);
+    const usableLat = Math.max(0.2, 1 - safeInsetTop - safeInset);
+    const minDelta = (_c = options == null ? void 0 : options.minLatitudeDelta) != null ? _c : MIN_LATITUDE_DELTA;
     let minLat = valid[0].latitude;
     let maxLat = valid[0].latitude;
     let minLng = valid[0].longitude;
@@ -146,7 +158,7 @@
     const midLng = (minLng + maxLng) / 2;
     const spanLat = maxLat - minLat;
     const spanLng = maxLng - minLng;
-    let latitudeDelta = Math.max(spanLat / usable, minDelta);
+    let latitudeDelta = Math.max(spanLat / usableLat, minDelta);
     let longitudeDelta = Math.max(spanLng / usable, minDelta);
     const cosLat = Math.max(0.2, Math.cos(midLat * Math.PI / 180));
     const latAsLng = latitudeDelta * cosLat;
@@ -156,8 +168,9 @@
     if (latitudeDelta < longitudeDelta * cosLat * 0.45) {
       latitudeDelta = longitudeDelta * cosLat * 0.45 / cosLat;
     }
+    const latitude = midLat + (safeInsetTop - safeInset) / 2 * latitudeDelta;
     return {
-      latitude: midLat,
+      latitude,
       longitude: midLng,
       latitudeDelta,
       longitudeDelta
@@ -169,7 +182,6 @@
     var _a, _b, _c, _d;
     let count = 0;
     for (const hole of (_a = round.holes) != null ? _a : []) {
-      if (hole.blowup) continue;
       for (const stroke of (_b = hole.strokes) != null ? _b : []) {
         if (((_c = stroke.position) == null ? void 0 : _c.latitude) && ((_d = stroke.position) == null ? void 0 : _d.longitude)) {
           count++;
@@ -269,7 +281,8 @@
       pinLabel,
       penalty,
       holdPos,
-      phase
+      phase,
+      puttsTaken
     } = args;
     for (let i = 0; i <= frameCount; i++) {
       const t = i / frameCount;
@@ -293,12 +306,32 @@
           firstFeet: distances.firstFeet,
           secondFeet: distances.secondFeet,
           puttCount: distances.puttCount,
+          puttsTaken,
           currentFeet,
           phase
         }
       });
     }
     return startTime + duration;
+  }
+  function buildPuttLegs(distances) {
+    const { firstFeet, secondFeet, puttCount } = distances;
+    if (puttCount <= 1) {
+      return [{ fromFeet: firstFeet, toFeet: 0, phase: "track", puttsTaken: 1 }];
+    }
+    const secondStart = secondFeet > 0 ? secondFeet : PUTT_TAP_IN_FEET;
+    const legs = [
+      { fromFeet: firstFeet, toFeet: secondStart, phase: "track", puttsTaken: 1 }
+    ];
+    for (let n = 2; n <= puttCount; n++) {
+      legs.push({
+        fromFeet: n === 2 ? secondStart : PUTT_TAP_IN_FEET,
+        toFeet: n === puttCount ? 0 : PUTT_TAP_IN_FEET,
+        phase: n === 2 ? "trackSecond" : "tapIn",
+        puttsTaken: n
+      });
+    }
+    return legs;
   }
   function appendPuttReplayFrames(args) {
     var _a, _b, _c;
@@ -311,41 +344,27 @@
     const pinLabel = formatReplayPinLabel(puttStroke, null);
     const penalty = strokePenalty(puttStroke);
     const strokeDuration = config.msPerStroke / config.speedMultiplier;
+    const tapInDuration = PUTT_TAP_IN_BEAT_MS / config.speedMultiplier;
     const trackFrames = Math.max(2, config.flightFramesPerStroke);
     const resultFrames = Math.max(2, Math.round(config.flightFramesPerStroke / 2));
-    const firstEndFeet = puttCount <= 1 ? 0 : secondFeet;
-    currentTime = appendPuttTrackFrames({
-      frames,
-      hole,
-      puttStroke,
-      strokeNumber,
-      startTime: currentTime,
-      duration: strokeDuration,
-      frameCount: trackFrames,
-      fromFeet: firstFeet,
-      toFeet: firstEndFeet,
-      distances,
-      pinLabel,
-      penalty,
-      holdPos,
-      phase: "track"
-    });
-    if (puttCount > 1 && secondFeet > 0) {
+    for (const leg of buildPuttLegs(distances)) {
+      const isTapIn = leg.phase === "tapIn";
       currentTime = appendPuttTrackFrames({
         frames,
         hole,
         puttStroke,
         strokeNumber,
         startTime: currentTime,
-        duration: strokeDuration,
-        frameCount: trackFrames,
-        fromFeet: secondFeet,
-        toFeet: 0,
+        duration: isTapIn ? tapInDuration : strokeDuration,
+        frameCount: isTapIn ? resultFrames : trackFrames,
+        fromFeet: leg.fromFeet,
+        toFeet: leg.toFeet,
         distances,
         pinLabel,
         penalty,
         holdPos,
-        phase: "trackSecond"
+        phase: leg.phase,
+        puttsTaken: leg.puttsTaken
       });
     }
     const resultDuration = strokeDuration * 0.5;
@@ -370,6 +389,7 @@
           firstFeet,
           secondFeet,
           puttCount,
+          puttsTaken: puttCount,
           currentFeet: 0,
           phase: "result"
         }
@@ -379,7 +399,7 @@
     return currentTime;
   }
   function buildHoleReplayTimeline(hole, config = DEFAULT_REPLAY_CONFIG) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const frames = [];
     let currentTime = 0;
     const strokes = (_a = hole.strokes) != null ? _a : [];
@@ -479,13 +499,24 @@
         penalty: strokePenalty(lastStroke)
       });
     }
+    if (hole.blowup) {
+      currentTime = appendBlowupHoldFrames({
+        frames,
+        hole,
+        lastStroke,
+        strokeNumber: gpsStrokes.length,
+        startTime: currentTime,
+        config
+      });
+    }
     const holeSegment = {
       holeNumber: hole.holeNumber,
       par: hole.par,
       startMs: 0,
       endMs: currentTime,
       strokes: strokes.length,
-      score: (_d = hole.score) != null ? _d : strokes.length
+      score: holeSegmentScore(hole),
+      ...hole.blowup ? { blowup: true } : {}
     };
     return {
       frames,
@@ -494,15 +525,42 @@
       totalStrokes: strokes.length
     };
   }
+  function holeSegmentScore(hole) {
+    var _a, _b, _c, _d;
+    if (hole.blowup) return ((_a = hole.par) != null ? _a : 0) * 2;
+    return (_d = hole.score) != null ? _d : (_c = (_b = hole.strokes) == null ? void 0 : _b.length) != null ? _c : 0;
+  }
+  function appendBlowupHoldFrames(args) {
+    var _a;
+    const { frames, hole, lastStroke, strokeNumber, startTime, config } = args;
+    const holdPos = (_a = lastStroke.position) != null ? _a : getHoleGreen(hole);
+    if (!holdPos) return startTime;
+    const hold = Math.max(0, config.msBlowupHold);
+    const frameCount = Math.max(2, Math.round(hold / 80));
+    for (let i = 0; i <= frameCount; i++) {
+      frames.push({
+        timestamp: startTime + hold * i / frameCount,
+        position: holdPos,
+        strokeNumber,
+        holeNumber: hole.holeNumber,
+        club: lastStroke.club || "Unknown",
+        distance: 0,
+        event: "blowup",
+        isKeyFrame: false,
+        pathKind: "swing",
+        lie: lastStroke.lie
+      });
+    }
+    return startTime + hold;
+  }
   function buildRoundReplayTimeline(round, config = DEFAULT_REPLAY_CONFIG) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e;
     const allFrames = [];
     const holeSegments = [];
     let currentTime = 0;
     let totalStrokes = 0;
     const playable = ((_a = round.holes) != null ? _a : []).filter((hole) => {
       var _a2;
-      if (hole.blowup) return false;
       return ((_a2 = hole.strokes) != null ? _a2 : []).some(
         (s) => {
           var _a3, _b2;
@@ -525,11 +583,12 @@
         startMs: currentTime,
         endMs: currentTime + holeTimeline.duration,
         strokes: (_c = (_b = hole.strokes) == null ? void 0 : _b.length) != null ? _c : 0,
-        score: (_f = hole.score) != null ? _f : (_e = (_d = hole.strokes) == null ? void 0 : _d.length) != null ? _e : 0
+        score: holeSegmentScore(hole),
+        ...hole.blowup ? { blowup: true } : {}
       };
       holeSegments.push(holeSegment);
       currentTime += holeTimeline.duration;
-      totalStrokes += (_h = (_g = hole.strokes) == null ? void 0 : _g.length) != null ? _h : 0;
+      totalStrokes += (_e = (_d = hole.strokes) == null ? void 0 : _d.length) != null ? _e : 0;
       if (playable[hi + 1]) {
         currentTime += 1;
       }
@@ -784,10 +843,14 @@
     }
     const isPutting = (frame == null ? void 0 : frame.pathKind) === "putt";
     let label = "\u2014";
-    if (isPutting && (frame == null ? void 0 : frame.puttTracker)) {
+    if ((frame == null ? void 0 : frame.event) === "blowup") {
+      label = "Blowup";
+    } else if (isPutting && (frame == null ? void 0 : frame.puttTracker)) {
       const n = frame.puttTracker.puttCount;
       if (frame.puttTracker.phase === "result") {
         label = `${n} putt${n === 1 ? "" : "s"}`;
+      } else if (n > 2 && frame.puttTracker.puttsTaken >= 2) {
+        label = `Putt ${frame.puttTracker.puttsTaken}\u2026`;
       } else {
         label = "Putting";
       }

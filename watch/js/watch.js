@@ -71,13 +71,21 @@
     });
   }
 
+  /** Zero-padded hh:mm, same as the app's formatRoundDurationHhMm. */
+  function formatDurationHhMm(totalMinutes) {
+    var h = Math.floor(totalMinutes / 60);
+    var m = Math.round(totalMinutes % 60);
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
   function scoreShapeClass(score, par) {
     if (score == null || par == null) return '';
     var diff = score - par;
-    if (diff <= -2) return 'circle';
+    if (diff <= -2) return 'eagle';
     if (diff === -1) return 'circle';
     if (diff === 1) return 'square';
-    if (diff >= 2) return 'double-square';
+    if (diff === 2) return 'double-square';
+    if (diff >= 3) return 'triple';
     return '';
   }
 
@@ -89,9 +97,9 @@
     return '';
   }
 
-  /** Putts on green — matches ExpandedMicroScorecard.getPutts. */
+  /** Putts on green — matches ExpandedMicroScorecard.getPutts (blowups contribute none). */
   function getPutts(hole) {
-    if (!hole || !hole.strokes || !hole.strokes.length) return 0;
+    if (!hole || hole.blowup || !hole.strokes || !hole.strokes.length) return 0;
     var putts = 0;
     hole.strokes.forEach(function (stroke) {
       if (stroke.club !== 'PU' || stroke.lie !== 'Green') return;
@@ -100,11 +108,50 @@
     return putts;
   }
 
+  /** Same "played" rule as the app scorecard: any strokes, or marked a blowup. */
+  function isPlayed(hole) {
+    return !!hole && (hole.blowup || !!(hole.strokes && hole.strokes.length));
+  }
+
   function holeScore(hole) {
-    if (!hole) return null;
+    if (!isPlayed(hole)) return null;
     if (hole.blowup) return (hole.par || 0) * 2;
     if (hole.score != null) return hole.score;
     return null;
+  }
+
+  function summarizeHoles(holes) {
+    var played = holes.filter(isPlayed);
+    var par = 0;
+    var score = 0;
+    var putts = 0;
+    played.forEach(function (hole) {
+      par += hole.par || 0;
+      score += holeScore(hole) || 0;
+      putts += getPutts(hole);
+    });
+    return { played: played.length, par: par, score: score, putts: putts, net: score - par };
+  }
+
+  var BLOWUP_GIF = 'img/blowup-bomb.gif';
+  /** Scorecard blowup cells: score for 2.5s, then one bomb loop (BlowupToggle). */
+  var BLOWUP_SHOW_MS = 2500;
+  var BLOWUP_ANIMATE_MS = ReplayEngine.BLOWUP_ANIMATION_MS || 1680;
+  var blowupToggleTimer = null;
+
+  function scheduleBlowupToggle(showBomb) {
+    clearTimeout(blowupToggleTimer);
+    var cells = document.querySelectorAll('.scorecard .blowup-toggle');
+    if (!cells.length) return;
+    cells.forEach(function (cell) {
+      cell.classList.toggle('show-bomb', showBomb);
+      var img = cell.querySelector('img');
+      // Re-assigning src restarts the gif so each burst plays from the lit fuse.
+      if (showBomb && img) img.src = BLOWUP_GIF + '?t=' + Date.now();
+    });
+    blowupToggleTimer = setTimeout(function () {
+      scheduleBlowupToggle(!showBomb);
+    }, showBomb ? BLOWUP_ANIMATE_MS : BLOWUP_SHOW_MS);
   }
 
   function holeByNumber(n) {
@@ -188,29 +235,47 @@
       parEl.textContent = hole && hole.par != null ? String(hole.par) : '—';
       btn.appendChild(parEl);
 
-      var score = hole ? holeScore(hole) : null;
-      var putts = hole ? getPutts(hole) : 0;
+      var score = holeScore(hole);
+      var putts = getPutts(hole);
+      var isBlowup = !!(hole && hole.blowup);
 
       var scoreWrap = document.createElement('span');
       scoreWrap.className = 'score-stack';
 
       var val = document.createElement('span');
-      val.className = 'score-val ' + scoreTone(score, hole && hole.par);
-      var shape = scoreShapeClass(score, hole && hole.par);
-      if (score != null && shape) {
-        var shapeEl = document.createElement('span');
-        shapeEl.className = 'score-shape ' + shape;
-        shapeEl.textContent = String(score);
-        val.appendChild(shapeEl);
+      if (isBlowup) {
+        val.className = 'score-val bogey';
+        var blowupEl = document.createElement('span');
+        blowupEl.className = 'score-shape blowup';
+        blowupEl.textContent = String(score);
+        val.appendChild(blowupEl);
       } else {
-        val.textContent = score != null ? String(score) : '—';
+        val.className = 'score-val ' + scoreTone(score, hole && hole.par);
+        var shape = scoreShapeClass(score, hole && hole.par);
+        if (score != null && shape) {
+          var shapeEl = document.createElement('span');
+          shapeEl.className = 'score-shape ' + shape;
+          shapeEl.textContent = String(score);
+          val.appendChild(shapeEl);
+        } else {
+          val.textContent = score != null ? String(score) : '-';
+        }
       }
       scoreWrap.appendChild(val);
 
       var puttsEl = document.createElement('span');
       puttsEl.className = 'hole-putts';
-      puttsEl.textContent = score != null ? String(putts) : '—';
+      puttsEl.textContent = score != null && !isBlowup ? String(putts) : '-';
       scoreWrap.appendChild(puttsEl);
+
+      if (isBlowup) {
+        scoreWrap.classList.add('blowup-toggle');
+        var bomb = document.createElement('img');
+        bomb.className = 'blowup-bomb';
+        bomb.src = BLOWUP_GIF;
+        bomb.alt = 'Blowup hole';
+        scoreWrap.appendChild(bomb);
+      }
 
       btn.appendChild(scoreWrap);
 
@@ -225,80 +290,58 @@
       return btn;
     }
 
-    function makeTotalCell(holes, label) {
-      var played = holes.filter(function (hole) {
-        return hole && (holeScore(hole) != null || (hole.strokes && hole.strokes.length));
-      });
-      var totalPar = played.reduce(function (sum, hole) {
-        return sum + (hole.par || 0);
-      }, 0);
-      var totalScore = played.reduce(function (sum, hole) {
-        return sum + (holeScore(hole) || 0);
-      }, 0);
-      var totalPutts = played.reduce(function (sum, hole) {
-        return sum + getPutts(hole);
-      }, 0);
-      var net = totalScore - totalPar;
-
+    function makeSummaryCell(summary, className, ariaLabel) {
       var cell = document.createElement('div');
-      cell.className = 'scorecard-total';
-      cell.setAttribute('aria-label', label + ' total');
-
-      var labelEl = document.createElement('span');
-      labelEl.className = 'total-label';
-      labelEl.textContent = label;
-      cell.appendChild(labelEl);
+      cell.className = className;
+      cell.setAttribute('aria-label', ariaLabel);
+      var has = summary.played > 0;
+      var net = summary.net;
 
       var parEl = document.createElement('span');
       parEl.className = 'total-par';
-      parEl.textContent = played.length ? String(totalPar) : '—';
+      parEl.textContent = has ? String(summary.par) : '-';
       cell.appendChild(parEl);
 
       var scoreEl = document.createElement('span');
       scoreEl.className = 'total-score';
-      scoreEl.textContent = played.length ? String(totalScore) : '—';
+      scoreEl.textContent = has ? String(summary.score) : '-';
       cell.appendChild(scoreEl);
 
       var puttsEl = document.createElement('span');
       puttsEl.className = 'total-putts';
-      puttsEl.textContent = played.length ? String(totalPutts) : '—';
+      puttsEl.textContent = summary.putts ? String(summary.putts) : '-';
       cell.appendChild(puttsEl);
 
       var netEl = document.createElement('span');
-      netEl.className =
-        'total-net' +
-        (played.length ? (net > 0 ? ' over' : net < 0 ? ' under' : '') : '');
-      netEl.textContent = played.length
-        ? (net > 0 ? '+' : '') + String(net)
-        : '—';
+      netEl.className = 'total-net' + (has ? (net > 0 ? ' over' : ' under') : '');
+      netEl.textContent = has ? (net > 0 ? '+' : '') + String(net) : '-';
       cell.appendChild(netEl);
 
       return cell;
     }
 
-    function renderRow(start, end, totalLabel) {
-      var row = document.createElement('div');
-      row.className = 'scorecard-row';
+    function appendNine(start, end, label, front) {
       var holes = [];
       for (var n = start; n <= end; n++) {
-        row.appendChild(makeHoleCell(n));
+        var cell = makeHoleCell(n);
+        if (front) cell.classList.add('front');
+        el.appendChild(cell);
         if (byNumber[n]) holes.push(byNumber[n]);
       }
-      row.appendChild(makeTotalCell(holes, totalLabel));
-      return row;
+      var total = makeSummaryCell(summarizeHoles(holes), 'scorecard-total', label + ' total');
+      if (front) total.classList.add('front');
+      el.appendChild(total);
     }
 
-    el.appendChild(renderRow(1, 9, 'Out'));
-    el.appendChild(renderRow(10, 18, 'In'));
+    // One 11-column grid (9 holes + nine total + overall), like ExpandedMicroScorecard.
+    // Auto-placement puts the overall cell in column 11 spanning both nines.
+    appendNine(1, 9, 'Out', true);
+    el.appendChild(
+      makeSummaryCell(summarizeHoles(state.round.holes), 'scorecard-overall', 'Round total')
+    );
+    appendNine(10, 18, 'In', false);
 
-    if (activeHole != null) {
-      var activeBtn = el.querySelector(
-        '.scorecard-cell[data-hole="' + activeHole + '"]'
-      );
-      if (activeBtn) {
-        activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-      }
-    }
+    scheduleBlowupToggle(false);
   }
 
   function appStoreUrl() {
@@ -334,7 +377,8 @@
     var seg = vm && vm.holeSegment;
     var hole = seg ? holeByNumber(seg.holeNumber) : null;
     if (seg) {
-      var score = hole && hole.score != null ? hole.score : seg.score;
+      var score = holeScore(hole);
+      if (score == null) score = seg.score;
       $('meta-hole').textContent =
         'Hole ' + seg.holeNumber + ' · Par ' + seg.par + ' · ' + score;
     } else {
@@ -504,12 +548,34 @@
       tracker.maxFeet ||
       (ReplayEngine.puttTrackerMaxFeet
         ? ReplayEngine.puttTrackerMaxFeet(tracker.firstFeet || 0)
-        : Math.max(1, Math.round((tracker.firstFeet || 0) * 1.5)));
+        : Math.max(10, Math.round((tracker.firstFeet || 0) * 1.5)));
     var clamp = function (ft) {
       return maxFeet <= 0 ? 0 : Math.max(0, Math.min(1, ft / maxFeet));
     };
+    var isRolling = tracker.phase !== 'result';
+    // 3+ putts: once the second putt is rolling, count up live (2 → 3 → N).
+    var showLiveCounter =
+      isRolling && tracker.puttCount > 2 && (tracker.puttsTaken || 0) >= 2;
+    wrap.setAttribute(
+      'aria-label',
+      tracker.phase === 'result'
+        ? tracker.puttCount === 1
+          ? '1 putt'
+          : tracker.puttCount + ' putts'
+        : showLiveCounter
+          ? 'Putt ' + tracker.puttsTaken + ', ' + Math.round(tracker.currentFeet) + "'"
+          : Math.round(tracker.currentFeet) + "'"
+    );
 
-    if (tracker.phase === 'result') {
+    if (showLiveCounter) {
+      var counter = document.createElement('div');
+      counter.className = 'putt-tracker-result';
+      counter.innerHTML =
+        '<span class="count ouch">' +
+        tracker.puttsTaken +
+        '</span><span class="label">putts…</span>';
+      wrap.appendChild(counter);
+    } else if (tracker.phase === 'result') {
       var result = document.createElement('div');
       result.className = 'putt-tracker-result';
       result.innerHTML =
@@ -559,7 +625,7 @@
         "'</div><div class=\"putt-frame-point\"></div>";
       track.appendChild(f2);
     }
-    if (tracker.phase === 'track' || tracker.phase === 'trackSecond') {
+    if (isRolling) {
       var dot = document.createElement('div');
       dot.className = 'putt-dot';
       dot.style.left = clamp(tracker.currentFeet) * 100 + '%';
@@ -592,6 +658,26 @@
 
   /** Hole frame: tee + green + swing GPS. Replay chrome is off-map → inset 0.08. */
   var REPLAY_MAP_SAFE_INSET = 0.08;
+  /** Half the app's stroke-pin box (72px): room for a pill above its GPS dot. */
+  var REPLAY_PIN_CLEARANCE_PX = 36;
+
+  /** Same as the app: the safe box starts below the yards-remaining panel (+ pin clearance). */
+  function cameraInsets() {
+    var chip = $('yards-chip');
+    if (chip && !chip.classList.contains('hidden') && chip.offsetHeight > 0) {
+      state.remainingPanelBottom = chip.offsetTop + chip.offsetHeight;
+    }
+    var wrap = document.querySelector('.watch-map-wrap');
+    var mapHeight = wrap ? wrap.clientHeight : 0;
+    if (!mapHeight || !state.remainingPanelBottom) {
+      return { safeInset: REPLAY_MAP_SAFE_INSET };
+    }
+    var topInset = (state.remainingPanelBottom + REPLAY_PIN_CLEARANCE_PX) / mapHeight;
+    return {
+      safeInset: REPLAY_MAP_SAFE_INSET,
+      safeInsetTop: Math.max(REPLAY_MAP_SAFE_INSET, topInset),
+    };
+  }
 
   function frameHoleCamera(holeNumber, force, opts) {
     if (!state.mapAdapter || !state.map || !state.timeline) return;
@@ -606,7 +692,7 @@
       state.timeline,
       holeNumber,
       hole,
-      { safeInset: REPLAY_MAP_SAFE_INSET }
+      cameraInsets()
     );
     if (!region) return;
     state.mapAdapter.fitRegion(region, {
@@ -711,9 +797,29 @@
         .addTo(state.map);
     }
 
+    var isBlowupHold = frame.event === 'blowup';
+    setBlowupOverlay(isBlowupHold);
+
     // Keep stable full-hole framing; putt chrome is a light top overlay only.
-    if (frame.pathKind === 'putt' && frame.puttTracker) {
+    if (!isBlowupHold && frame.pathKind === 'putt' && frame.puttTracker) {
       showPuttOverlay(frame.puttTracker);
+    }
+  }
+
+  /** Bomb plays once per blowup hold (app BlowupAnimation); restart the gif on each entry. */
+  function setBlowupOverlay(show) {
+    var el = $('blowup-overlay');
+    if (!el) return;
+    if (show) $('yards-chip').classList.add('hidden');
+    var visible = !el.classList.contains('hidden');
+    if (show === visible) return;
+    var img = el.querySelector('img');
+    if (show) {
+      if (img) img.src = BLOWUP_GIF + '?t=' + Date.now();
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+      if (img) img.removeAttribute('src');
     }
   }
 
@@ -877,6 +983,7 @@
     if (meta.tees) bits.push(meta.tees + (/\btees?\b/i.test(meta.tees) ? '' : ' tees'));
     if (meta.datePlayed) bits.push(formatDate(meta.datePlayed));
     if (meta.playerDisplayName) bits.push(meta.playerDisplayName);
+    if (meta.durationMinutes > 0) bits.push(formatDurationHhMm(meta.durationMinutes));
     var durationEl = $('meta-duration');
     if (bits.length) {
       durationEl.textContent = bits.join(' · ');

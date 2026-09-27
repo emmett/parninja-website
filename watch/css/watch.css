@@ -134,27 +134,32 @@ body {
   display: none;
 }
 
+/* One 11-column grid: 9 holes + nine total + overall (ExpandedMicroScorecard). */
 .scorecard {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
-}
-
-.scorecard-row {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(30px, 0.9fr);
+  grid-template-columns: repeat(11, minmax(0, 1fr));
   align-items: stretch;
   gap: 0;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0;
+  width: 100%;
+  max-width: 484px;
+  margin: 0 auto;
   line-height: 1.05;
 }
 
-.scorecard-row:last-child {
-  border-bottom: none;
+.scorecard .front {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.scorecard-overall {
+  grid-row: span 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 0;
+  border-left: 1px solid #e0e0e0;
+  text-align: center;
 }
 
 .scorecard-cell {
@@ -229,9 +234,21 @@ body {
   color: var(--bogey);
 }
 
-.scorecard-cell .hole-putts,
-.scorecard-total .total-putts {
-  display: none;
+.scorecard-cell .hole-putts {
+  display: block;
+  font-size: 0.5rem;
+  color: #666;
+  line-height: 1;
+  margin-top: 0;
+}
+
+.scorecard-total .total-putts,
+.scorecard-overall .total-putts {
+  display: block;
+  font-size: 0.5rem;
+  color: #666;
+  line-height: 1;
+  margin-top: 0;
 }
 
 .score-shape {
@@ -276,23 +293,16 @@ body {
   gap: 0;
 }
 
-.scorecard-total .total-label {
-  font-size: 0.5rem;
-  font-weight: 700;
-  color: #333;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  line-height: 1;
-}
-
-.scorecard-total .total-par {
+.scorecard-total .total-par,
+.scorecard-overall .total-par {
   font-size: 0.5rem;
   color: #666;
   margin-top: 0;
   line-height: 1;
 }
 
-.scorecard-total .total-score {
+.scorecard-total .total-score,
+.scorecard-overall .total-score {
   font-size: 0.6875rem;
   font-weight: 700;
   color: #111;
@@ -300,7 +310,8 @@ body {
   line-height: 1;
 }
 
-.scorecard-total .total-net {
+.scorecard-total .total-net,
+.scorecard-overall .total-net {
   font-size: 0.5625rem;
   font-weight: 600;
   color: #333;
@@ -308,12 +319,70 @@ body {
   line-height: 1;
 }
 
-.scorecard-total .total-net.over {
+.scorecard-total .total-net.over,
+.scorecard-overall .total-net.over {
   color: #f44336;
 }
 
-.scorecard-total .total-net.under {
+.scorecard-total .total-net.under,
+.scorecard-overall .total-net.under {
   color: #4caf50;
+}
+
+.scorecard-overall .total-score {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #1b1b1b;
+  margin: 2px 0 1px;
+}
+
+/* Eagle or better / triple or worse: bordered box with faint diagonal stripes. */
+.score-shape.eagle {
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  background: repeating-linear-gradient(
+    -60deg,
+    rgba(76, 175, 80, 0.15) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+.score-shape.triple {
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  background: #ffebee
+    repeating-linear-gradient(-60deg, rgba(244, 67, 54, 0.15) 0 1px, transparent 1px 3px);
+  padding: 0 2px;
+}
+
+.score-shape.blowup {
+  border: 1px solid #f44336;
+  border-radius: 2px;
+  background: #ffebee;
+  color: #f44336;
+  padding: 0 2px;
+}
+
+/* Blowup cells alternate the score with one bomb loop (app BlowupToggle). */
+.scorecard-cell .blowup-toggle {
+  position: relative;
+}
+
+.scorecard-cell .blowup-bomb {
+  display: none;
+  width: 1.4rem;
+  height: 1.75rem;
+  object-fit: contain;
+}
+
+.scorecard-cell .blowup-toggle.show-bomb > :not(.blowup-bomb) {
+  display: none;
+}
+
+.scorecard-cell .blowup-toggle.show-bomb .blowup-bomb {
+  display: block;
 }
 
 /* Phone landscape / short height: keep map usable */
@@ -323,7 +392,8 @@ body {
   }
 
   .scorecard-cell .hole-putts,
-  .scorecard-total .total-putts {
+  .scorecard-total .total-putts,
+  .scorecard-overall .total-putts {
     display: none;
   }
 
@@ -384,11 +454,11 @@ body {
   }
 
   .scorecard {
-    max-width: 560px;
+    max-width: 572px;
   }
 
-  .scorecard-row {
-    grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(34px, 0.9fr);
+  .scorecard-overall .total-score {
+    font-size: 1.375rem;
   }
 
   .scorecard-cell .hole-num {
@@ -399,7 +469,8 @@ body {
   .scorecard-cell .hole-putts,
   .scorecard-total .total-par,
   .scorecard-total .total-putts,
-  .scorecard-total .total-label {
+  .scorecard-overall .total-par,
+  .scorecard-overall .total-putts {
     font-size: 0.5625rem;
   }
 
@@ -413,14 +484,19 @@ body {
     height: 1.05rem;
   }
 
-  .scorecard-total .total-net {
+  .scorecard-total .total-net,
+  .scorecard-overall .total-net {
     font-size: 0.625rem;
   }
 }
 
 @media (min-width: 960px) {
   .scorecard {
-    max-width: 600px;
+    max-width: 616px;
+  }
+
+  .scorecard-overall .total-score {
+    font-size: 1.5rem;
   }
 }
 
@@ -490,6 +566,26 @@ body {
 
 .putt-overlay.hidden {
   display: none;
+}
+
+.blowup-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blowup-overlay.hidden {
+  display: none;
+}
+
+.blowup-overlay img {
+  width: 112px;
+  height: 140px;
+  object-fit: contain;
 }
 
 .putt-overlay .putt-tracker {
@@ -804,6 +900,10 @@ body {
   font-weight: 800;
   color: var(--forest);
   line-height: 1;
+}
+
+.putt-tracker-result .count.ouch {
+  color: #b91c1c;
 }
 
 .putt-tracker-result .label {

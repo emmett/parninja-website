@@ -290,6 +290,17 @@
     return n / 1e5;
   }
 
+  /** Great-circle distance in yards; share packs omit distanceRemaining, so derive it. */
+  function yardsBetween(lat1, lng1, lat2, lng2) {
+    var toRad = Math.PI / 180;
+    var dLat = (lat2 - lat1) * toRad;
+    var dLng = (lng2 - lng1) * toRad;
+    var a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a))) * 1.0936133;
+  }
+
   function expandTee(t) {
     if (!t) return '';
     if (TEE_FROM_SHORT[t]) return TEE_FROM_SHORT[t];
@@ -307,9 +318,11 @@
 
   /**
    * App share pack v2:
-   *   { v:2, m:[course,tees,YYYYMMDD], C:[clubs], L:["T","F",...], h:[
-   *     [par, [teeLatE5,teeLngE5], [greenLatE5,greenLngE5], strokes]
+   *   { v:2, m:[course,tees,YYYYMMDD,startHole?], C:[clubs], L:["T","F",...], h:[
+   *     [par, [teeLatE5,teeLngE5], [greenLatE5,greenLngE5], strokes, blowup?]
    *   ] }
+   * blowup: optional 5th slot, 1 when the hole was marked a blowup (scores 2× par).
+   * d: optional round duration in whole minutes.
    * Stroke rows:
    *   first: [c] | [c, penalty] at tee (lie Tee)
    *          [c, lie] | [c, lie, penalty] if not from Tee
@@ -325,12 +338,15 @@
       tees: expandTee(m[1] || ''),
       datePlayed: expandDate(m[2] || ''),
     };
+    if (typeof doc.d === 'number' && doc.d > 0) meta.durationMinutes = doc.d;
     var holes = [];
     var rows = doc.h || [];
+    var startHole = typeof m[3] === 'number' && m[3] > 0 ? m[3] : 1;
 
     for (var hi = 0; hi < rows.length; hi++) {
       var row = rows[hi];
       var par = row[0] | 0;
+      var blowup = row[4] === 1;
       var tee = row[1];
       var green = row[2];
       var packed = row[3] || [];
@@ -398,6 +414,9 @@
         if (firstPuttDistance != null) stroke.firstPuttDistance = firstPuttDistance;
         if (lastPuttDistance != null) stroke.lastPuttDistance = lastPuttDistance;
         if (penalty) stroke.penalty = penalty;
+        if (strokeCount == null && (greenLat || greenLng)) {
+          stroke.distanceRemaining = yardsBetween(lat, lng, greenLat, greenLng);
+        }
 
         var add = strokeCount != null ? strokeCount : 1;
         score += add + penalty;
@@ -408,9 +427,10 @@
       }
 
       holes.push({
-        holeNumber: hi + 1,
+        holeNumber: startHole + hi,
         par: par,
-        score: score,
+        blowup: blowup,
+        score: blowup ? par * 2 : strokes.length ? score : null,
         greenPosition: { latitude: greenLat, longitude: greenLng },
         strokes: strokes,
       });
