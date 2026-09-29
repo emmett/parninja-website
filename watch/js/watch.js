@@ -5,7 +5,8 @@
 (function () {
   'use strict';
 
-  var FRAME_MS = ReplayEngine.FRAME_MS || 33;
+  /** Longest wall-clock step per animation frame, so a backgrounded tab doesn't leap ahead. */
+  var MAX_PLAY_STEP_MS = 100;
   var PATH = ReplayEngine.HOLE_PATH_POLYLINE || {
     outline: { color: 'rgba(255,255,255,0.94)', width: 9 },
     main: { color: '#14532d', width: 5 },
@@ -34,11 +35,12 @@
     controller: null,
     map: null,
     mapAdapter: null,
-    playTimer: null,
+    playRaf: null,
     cameraHoleNumber: null,
     markers: [],
-    ballMarker: null,
-    puttMarker: null,
+    pinKey: null,
+    tickKey: null,
+    frames: [],
     lastHoleNumber: null,
   };
 
@@ -183,9 +185,9 @@
   }
 
   function clearPlayTimer() {
-    if (state.playTimer) {
-      clearInterval(state.playTimer);
-      state.playTimer = null;
+    if (state.playRaf != null) {
+      cancelAnimationFrame(state.playRaf);
+      state.playRaf = null;
     }
   }
 
@@ -397,6 +399,28 @@
     $('scrubber-label').textContent =
       labelFrame && labelFrame.event === 'blowup' ? 'Blowup' : scrubber.label;
 
+    var tickKey =
+      (seg ? seg.holeNumber : '') +
+      '|' +
+      scrubber.activeStrokeIndex +
+      '|' +
+      scrubber.strokeTimes.join(',');
+    if (tickKey !== state.tickKey) {
+      state.tickKey = tickKey;
+      renderTicks(scrubber);
+    }
+
+    var chip = $('yards-chip');
+    var yardsVal = $('yards-value');
+    if (vm && vm.yardsRemaining != null) {
+      yardsVal.textContent = String(Math.round(vm.yardsRemaining));
+      chip.classList.remove('hidden');
+    } else {
+      chip.classList.add('hidden');
+    }
+  }
+
+  function renderTicks(scrubber) {
     var ticks = $('scrubber-ticks');
     ticks.innerHTML = '';
     scrubber.strokeTimes.forEach(function (t, i) {
@@ -442,15 +466,6 @@
       });
       ticks.appendChild(b);
     });
-
-    var chip = $('yards-chip');
-    var yardsVal = $('yards-value');
-    if (vm && vm.yardsRemaining != null) {
-      yardsVal.textContent = String(Math.round(vm.yardsRemaining));
-      chip.classList.remove('hidden');
-    } else {
-      chip.classList.add('hidden');
-    }
   }
 
   function updateButtons() {
@@ -485,29 +500,88 @@
       m.remove();
     });
     state.markers = [];
-    if (state.ballMarker) {
-      state.ballMarker.remove();
-      state.ballMarker = null;
-    }
-    if (state.puttMarker) {
-      state.puttMarker.remove();
-      state.puttMarker = null;
-    }
+    state.pinKey = null;
+    hidePuttOverlay();
+  }
+
+  function hidePuttOverlay() {
     var puttEl = $('putt-overlay');
-    if (puttEl) {
+    if (puttEl && !puttEl.classList.contains('hidden')) {
       puttEl.innerHTML = '';
       puttEl.classList.add('hidden');
     }
   }
 
-  function setTrailSegments(segments) {
+  function setTrailSegments(segments, ball) {
     if (!state.mapAdapter) return;
-    state.mapAdapter.setPathSegments(segments || [], {
-      outlineColor: PATH.outline.color,
-      outlineWidth: PATH.outline.width,
-      mainColor: PATH.main.color,
-      mainWidth: PATH.main.width,
+    state.mapAdapter.setPathSegments(
+      segments || [],
+      {
+        outlineColor: PATH.outline.color,
+        outlineWidth: PATH.outline.width,
+        mainColor: PATH.main.color,
+        mainWidth: PATH.main.width,
+      },
+      ball || null
+    );
+  }
+
+  /**
+   * Ball between the two engine frames around `t`. The engine keeps ~10 frames per stroke
+   * and getFrameAtTime snaps to the nearest one, which steps every ~200ms and can sit
+   * ahead of the drawn trail.
+   */
+  function ballAt(t) {
+    var frames = state.frames;
+    if (!frames.length) return null;
+    var lo = 0;
+    var hi = frames.length - 1;
+    if (t < frames[0].timestamp) hi = 0;
+    while (lo < hi) {
+      var mid = (lo + hi + 1) >> 1;
+      if (frames[mid].timestamp <= t) lo = mid;
+      else hi = mid - 1;
+    }
+    var a = frames[lo];
+    var b = frames[lo + 1];
+    var position = a.position;
+    if (
+      b &&
+      b.timestamp > a.timestamp &&
+      b.holeNumber === a.holeNumber &&
+      b.strokeNumber === a.strokeNumber &&
+      b.pathKind === a.pathKind
+    ) {
+      var f = Math.max(0, Math.min(1, (t - a.timestamp) / (b.timestamp - a.timestamp)));
+      position = {
+        latitude: a.position.latitude + (b.position.latitude - a.position.latitude) * f,
+        longitude: a.position.longitude + (b.position.longitude - a.position.longitude) * f,
+      };
+    }
+    return { position: position, from: a.position, pathKind: a.pathKind, holeNumber: a.holeNumber };
+  }
+
+  /** Trail up to `t` for this hole, ending exactly at the ball. */
+  function trailTo(t, holeNumber, ball) {
+    var segments = ReplayEngine.getReplayPathSegments(state.timeline, t).filter(function (s) {
+      return s.kind === 'swing' && s.holeNumber === holeNumber && s.coordinates.length >= 2;
     });
+    if (!ball || ball.pathKind !== 'swing' || ball.holeNumber !== holeNumber) return segments;
+    var tip = ball.position;
+    var last = segments[segments.length - 1];
+    if (last) {
+      var end = last.coordinates[last.coordinates.length - 1];
+      if (end.latitude !== tip.latitude || end.longitude !== tip.longitude) {
+        segments[segments.length - 1] = {
+          kind: last.kind,
+          holeNumber: last.holeNumber,
+          coordinates: last.coordinates.concat([tip]),
+        };
+      }
+    } else if (ball.from.latitude !== tip.latitude || ball.from.longitude !== tip.longitude) {
+      segments.push({ kind: 'swing', holeNumber: holeNumber, coordinates: [ball.from, tip] });
+    }
+    return segments;
   }
 
   function makePinElement(label, lie, selected, offsetSide, penalty) {
@@ -751,33 +825,60 @@
     }
     empty.classList.remove('visible');
 
-    var segments = ReplayEngine.getReplayPathSegments(
-      state.timeline,
-      state.currentTime
-    ).filter(function (s) {
-      return s.kind === 'swing' && s.holeNumber === holeNumber && s.coordinates.length >= 2;
-    });
-    setTrailSegments(segments);
+    var ball = ballAt(state.currentTime);
+    setTrailSegments(
+      trailTo(state.currentTime, holeNumber, ball),
+      ball && ball.holeNumber === holeNumber ? ball.position : frame.position
+    );
 
-    clearMarkers();
+    renderPins(holeNumber, frame.strokeNumber);
 
+    var isBlowupHold = frame.event === 'blowup';
+    setBlowupOverlay(isBlowupHold);
+
+    // Keep stable full-hole framing; putt chrome is a light top overlay only.
+    if (!isBlowupHold && frame.pathKind === 'putt' && frame.puttTracker) {
+      showPuttOverlay(frame.puttTracker);
+    } else {
+      hidePuttOverlay();
+    }
+  }
+
+  /** Pins are DOM markers; only rebuild when the reached set or the selected stroke changes. */
+  function renderPins(holeNumber, selectedStroke) {
     var pins = ReplayEngine.getReplayPins(state.timeline, state.currentTime).filter(
       function (p) {
         return p.holeNumber === holeNumber;
       }
     );
-    var positions = pins.map(function (p) {
-      return p.position;
-    });
-    var offsets = PinLabel.mapPinOffsetsForCrowd(positions);
-    var selectedStroke = frame.strokeNumber;
+    var key =
+      holeNumber +
+      '|' +
+      selectedStroke +
+      '|' +
+      pins
+        .map(function (p) {
+          return p.strokeNumber;
+        })
+        .join(',');
+    if (key === state.pinKey) return;
 
+    state.markers.forEach(function (m) {
+      m.remove();
+    });
+    state.markers = [];
+    state.pinKey = key;
+
+    var offsets = PinLabel.mapPinOffsetsForCrowd(
+      pins.map(function (p) {
+        return p.position;
+      })
+    );
     pins.forEach(function (pin, i) {
-      var selected = pin.strokeNumber === selectedStroke;
       var el = makePinElement(
         pin.pinLabel || pin.club || '',
         pin.lie,
-        selected,
+        pin.strokeNumber === selectedStroke,
         offsets[i],
         pin.penalty
       );
@@ -790,25 +891,6 @@
         .addTo(state.map);
       state.markers.push(marker);
     });
-
-    if (frame.position) {
-      var ballEl = document.createElement('div');
-      ballEl.className = 'ball-marker';
-      state.ballMarker = new maplibregl.Marker({
-        element: ballEl,
-        anchor: 'center',
-      })
-        .setLngLat([frame.position.longitude, frame.position.latitude])
-        .addTo(state.map);
-    }
-
-    var isBlowupHold = frame.event === 'blowup';
-    setBlowupOverlay(isBlowupHold);
-
-    // Keep stable full-hole framing; putt chrome is a light top overlay only.
-    if (!isBlowupHold && frame.pathKind === 'putt' && frame.puttTracker) {
-      showPuttOverlay(frame.puttTracker);
-    }
   }
 
   /** Bomb plays once per blowup hold (app BlowupAnimation); restart the gif on each entry. */
@@ -828,16 +910,35 @@
     }
   }
 
+  /**
+   * Advance by real elapsed time each display frame. The controller's playTick steps a fixed
+   * 33ms per call, which judders against 60/120Hz refresh when driven by setInterval.
+   */
   function schedulePlay() {
     clearPlayTimer();
     syncFromController();
     if (!state.playing || !state.controller) return;
-    state.playTimer = setInterval(function () {
-      var cont = state.controller.playTick();
+    var last = null;
+    function step(now) {
+      state.playRaf = null;
+      syncFromController();
+      if (!state.playing) return;
+      var dt = last == null ? 0 : Math.min(MAX_PLAY_STEP_MS, now - last);
+      last = now;
+      var next = state.currentTime + dt * state.speed;
+      if (next >= state.timeline.duration) {
+        state.controller.seekTo(state.timeline.duration);
+        state.controller.setPlaying(false);
+        syncFromController();
+        renderFrame();
+        return;
+      }
+      state.controller.seekTo(next);
       syncFromController();
       renderFrame();
-      if (!cont) clearPlayTimer();
-    }, FRAME_MS);
+      state.playRaf = requestAnimationFrame(step);
+    }
+    state.playRaf = requestAnimationFrame(step);
   }
 
   function togglePlayback() {
@@ -979,8 +1080,13 @@
     state.timeline = ReplayEngine.buildRoundReplayTimeline(normalized);
     state.controller = ReplayEngine.createReplayController(state.timeline);
     syncFromController();
+    state.frames = state.timeline.frames.slice().sort(function (a, b) {
+      return a.timestamp - b.timestamp;
+    });
     state.cameraHoleNumber = null;
     state.lastHoleNumber = null;
+    state.pinKey = null;
+    state.tickKey = null;
 
     var meta = normalized.meta || {};
     $('meta-course').textContent = meta.course || 'Shared round';

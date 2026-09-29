@@ -8,9 +8,13 @@
   var TRAIL_SOURCE = 'replay-trail';
   var TRAIL_OUTLINE = 'replay-trail-outline';
   var TRAIL_MAIN = 'replay-trail-main';
+  var TRAIL_BALL = 'replay-trail-ball';
+  var IS_LINE = ['==', ['geometry-type'], 'LineString'];
+  var IS_POINT = ['==', ['geometry-type'], 'Point'];
 
   function ensureTrailLayers(map, style) {
     if (!map.getSource(TRAIL_SOURCE)) {
+      // Ball lives in the trail source so the GL line tip and ball always land in the same paint.
       map.addSource(TRAIL_SOURCE, {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -19,6 +23,7 @@
         id: TRAIL_OUTLINE,
         type: 'line',
         source: TRAIL_SOURCE,
+        filter: IS_LINE,
         paint: {
           'line-color': style.outlineColor,
           'line-width': style.outlineWidth,
@@ -30,12 +35,26 @@
         id: TRAIL_MAIN,
         type: 'line',
         source: TRAIL_SOURCE,
+        filter: IS_LINE,
         paint: {
           'line-color': style.mainColor,
           'line-width': style.mainWidth,
           'line-opacity': 1,
         },
         layout: { 'line-cap': 'round', 'line-join': 'round' },
+      });
+      map.addLayer({
+        id: TRAIL_BALL,
+        type: 'circle',
+        source: TRAIL_SOURCE,
+        filter: IS_POINT,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#ffffff',
+          'circle-stroke-color': '#111111',
+          'circle-stroke-width': 2,
+          'circle-pitch-alignment': 'map',
+        },
       });
     }
   }
@@ -64,7 +83,8 @@
           maxZoom: opts.maxZoom != null ? opts.maxZoom : 18.5,
         });
       },
-      setPathSegments: function (segments, style) {
+      /** `ball` (optional GpsPosition) is drawn as a circle in the same update as the trail. */
+      setPathSegments: function (segments, style, ball) {
         ensureTrailLayers(map, style);
         var features = (segments || []).map(function (seg) {
           return {
@@ -78,6 +98,13 @@
             },
           };
         });
+        if (ball) {
+          features.push({
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Point', coordinates: [ball.longitude, ball.latitude] },
+          });
+        }
         map.getSource(TRAIL_SOURCE).setData({
           type: 'FeatureCollection',
           features: features,
