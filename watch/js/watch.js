@@ -619,7 +619,119 @@
     return stack;
   }
 
+  /** Pin-frame 2D putt overlay when tracker.green is set (Complex polar / P4). */
+  function buildPuttGreenEl(tracker) {
+    var green = tracker.green;
+    var wrap = document.createElement('div');
+    wrap.className = 'putt-tracker putt-tracker-green';
+    var maxFeet = (green && green.maxFeet) || tracker.maxFeet || 20;
+    var size = 168;
+    var half = size / 2 - 14;
+    var pxPerFoot = half / Math.max(8, maxFeet);
+    var isRolling = tracker.phase !== 'result';
+    wrap.setAttribute(
+      'aria-label',
+      tracker.phase === 'result'
+        ? tracker.puttCount === 1
+          ? '1 putt'
+          : tracker.puttCount + ' putts'
+        : 'Putting'
+    );
+
+    if (tracker.phase === 'result') {
+      var result = document.createElement('div');
+      result.className = 'putt-tracker-result';
+      result.innerHTML =
+        '<span class="count">' +
+        tracker.puttCount +
+        '</span><span class="label">' +
+        (tracker.puttCount === 1 ? 'putt' : 'putts') +
+        '</span>';
+      wrap.appendChild(result);
+    } else {
+      var title = document.createElement('p');
+      title.className = 'putt-tracker-title';
+      title.textContent =
+        tracker.puttCount > 2 && (tracker.puttsTaken || 0) >= 2
+          ? 'Putt ' + tracker.puttsTaken
+          : 'Putting';
+      wrap.appendChild(title);
+    }
+
+    var toXY = function (mark) {
+      if (ReplayEngine.polarToPinFeet) {
+        var p = ReplayEngine.polarToPinFeet(mark);
+        return { x: size / 2 + p.x * pxPerFoot, y: size / 2 + p.y * pxPerFoot };
+      }
+      var rad = ((mark.bearingDeg || 0) * Math.PI) / 180;
+      var r = Math.max(0, mark.radiusFeet || 0) * pxPerFoot;
+      return { x: size / 2 + r * Math.sin(rad), y: size / 2 + r * Math.cos(rad) };
+    };
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', String(size));
+    svg.setAttribute('height', String(size));
+    svg.setAttribute('viewBox', '0 0 ' + size + ' ' + size);
+    svg.classList.add('putt-green-svg');
+
+    var bg = document.createElementNS(svgNS, 'circle');
+    bg.setAttribute('cx', String(size / 2));
+    bg.setAttribute('cy', String(size / 2));
+    bg.setAttribute('r', String(half + 2));
+    bg.setAttribute('fill', 'rgba(92, 158, 78, 0.36)');
+    bg.setAttribute('stroke', 'rgba(46, 100, 40, 0.55)');
+    svg.appendChild(bg);
+
+    var axis = document.createElementNS(svgNS, 'line');
+    axis.setAttribute('x1', String(size / 2));
+    axis.setAttribute('y1', String(size / 2 - half));
+    axis.setAttribute('x2', String(size / 2));
+    axis.setAttribute('y2', String(size / 2 + half));
+    axis.setAttribute('stroke', 'rgba(30, 41, 59, 0.25)');
+    svg.appendChild(axis);
+
+    var pin = document.createElementNS(svgNS, 'circle');
+    pin.setAttribute('cx', String(size / 2));
+    pin.setAttribute('cy', String(size / 2));
+    pin.setAttribute('r', '3.5');
+    pin.setAttribute('fill', '#0f172a');
+    svg.appendChild(pin);
+
+    var addMark = function (mark, r, fill) {
+      if (!mark) return;
+      var xy = toXY(mark);
+      var c = document.createElementNS(svgNS, 'circle');
+      c.setAttribute('cx', String(xy.x));
+      c.setAttribute('cy', String(xy.y));
+      c.setAttribute('r', String(r));
+      c.setAttribute('fill', fill);
+      c.setAttribute('stroke', '#fff');
+      c.setAttribute('stroke-width', '1.5');
+      svg.appendChild(c);
+    };
+    addMark(green.marks && green.marks.first, 5, '#14532d');
+    addMark(green.marks && green.marks.second, 4.5, '#166534');
+    addMark(green.marks && green.marks.finish, 4, '#86efac');
+
+    if (isRolling && green.current) {
+      var ball = document.createElementNS(svgNS, 'circle');
+      ball.setAttribute('cx', String(size / 2 + green.current.x * pxPerFoot));
+      ball.setAttribute('cy', String(size / 2 + green.current.y * pxPerFoot));
+      ball.setAttribute('r', '5.5');
+      ball.setAttribute('fill', '#14532d');
+      ball.setAttribute('stroke', '#fff');
+      ball.setAttribute('stroke-width', '2');
+      svg.appendChild(ball);
+    }
+
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
   function buildPuttTrackerEl(tracker) {
+    if (tracker && tracker.green) return buildPuttGreenEl(tracker);
+
     var wrap = document.createElement('div');
     wrap.className = 'putt-tracker';
     // App: scale max = 1.5× first putt (puttTrackerMaxFeet).

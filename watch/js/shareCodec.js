@@ -369,6 +369,7 @@
         var strokeCount = null;
         var firstPuttDistance = null;
         var lastPuttDistance = null;
+        var strokePolar = null;
 
         if (si === 0) {
           // [c] | [c, pen] at Tee; [c, lie] | [c, lie, pen] otherwise
@@ -390,13 +391,34 @@
           lie = LIE_FROM_CHAR[lieChars[lieIx]] || 'Fairway';
           var isPutt = club === 'PU' && lie === 'Green';
           if (isPutt) {
-            // [c, G, puttCount, firstPuttFeet] optionally + lastPuttFeet (not penalty)
+            // [c, G, puttCount, firstPuttFeet] optionally + lastPuttFeet
+            // + optional Complex polar: [b1, r1Tenths, (b2, r2)?, (bF, rF)?] from index 5
             strokeCount = Math.max(1, s[2] | 0);
             firstPuttDistance = (s[3] | 0) / 3; // feet → yards
             lat = greenLat;
             lng = greenLng;
             if (strokeCount > 1 && s.length > 4 && (s[4] | 0) > 0) {
               lastPuttDistance = (s[4] | 0) / 3;
+            }
+            if (s.length >= 7) {
+              strokePolar = {
+                firstPuttPolar: {
+                  bearingDeg: ((s[5] | 0) % 360 + 360) % 360,
+                  radiusFeet: Math.max(0, s[6] | 0) / 10,
+                },
+              };
+              if (s.length >= 9 && ((s[7] | 0) !== 0 || (s[8] | 0) !== 0)) {
+                strokePolar.secondPuttPolar = {
+                  bearingDeg: ((s[7] | 0) % 360 + 360) % 360,
+                  radiusFeet: Math.max(0, s[8] | 0) / 10,
+                };
+              }
+              if (s.length >= 11) {
+                strokePolar.secondPuttFinishPolar = {
+                  bearingDeg: ((s[9] | 0) % 360 + 360) % 360,
+                  radiusFeet: Math.max(0, s[10] | 0) / 10,
+                };
+              }
             }
           } else {
             lat = prevLat + fromE5(s[2] | 0);
@@ -413,6 +435,13 @@
         if (strokeCount != null) stroke.strokeCount = strokeCount;
         if (firstPuttDistance != null) stroke.firstPuttDistance = firstPuttDistance;
         if (lastPuttDistance != null) stroke.lastPuttDistance = lastPuttDistance;
+        if (strokePolar) {
+          if (strokePolar.firstPuttPolar) stroke.firstPuttPolar = strokePolar.firstPuttPolar;
+          if (strokePolar.secondPuttPolar) stroke.secondPuttPolar = strokePolar.secondPuttPolar;
+          if (strokePolar.secondPuttFinishPolar) {
+            stroke.secondPuttFinishPolar = strokePolar.secondPuttFinishPolar;
+          }
+        }
         if (penalty) stroke.penalty = penalty;
         if (strokeCount == null && (greenLat || greenLng)) {
           stroke.distanceRemaining = yardsBetween(lat, lng, greenLat, greenLng);

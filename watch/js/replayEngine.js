@@ -1,7 +1,9 @@
 /**
  * @parninja/replay — GENERATED FILE. Do not edit by hand.
- * Source: packages/replay (app repo @ d35c94f3). Rebuild: scripts/build-replay-engine.sh
+ * Source: packages/replay (app repo). Rebuild: npm run build:watch-replay
  */
+
+"use strict";
 (() => {
   var __defProp = Object.defineProperty;
   var __export = (target, all) => {
@@ -26,6 +28,7 @@
     STYLIZED_LANDSCAPE: () => STYLIZED_LANDSCAPE,
     applyFrameToMapAdapter: () => applyFrameToMapAdapter,
     buildHoleReplayTimeline: () => buildHoleReplayTimeline,
+    buildPuttGreenMarks: () => buildPuttGreenMarks,
     buildPuttLegs: () => buildPuttLegs,
     buildPuttTrackerDistances: () => buildPuttTrackerDistances,
     buildRoundReplayTimeline: () => buildRoundReplayTimeline,
@@ -51,8 +54,11 @@
     getZoomLevelForClub: () => getZoomLevelForClub,
     hasReplayableGpsData: () => hasReplayableGpsData,
     interpolateFlightPath: () => interpolateFlightPath,
+    lerpPinFeet: () => lerpPinFeet,
     nextPlaybackSpeed: () => nextPlaybackSpeed,
     normalizeRoundForReplay: () => normalizeRoundForReplay,
+    pinFeetRadius: () => pinFeetRadius,
+    polarToPinFeet: () => polarToPinFeet,
     puttTrackerMaxFeet: () => puttTrackerMaxFeet,
     regionFramingPoints: () => regionFramingPoints,
     toReplayMapFrame: () => toReplayMapFrame
@@ -95,6 +101,26 @@
     flightFramesPerStroke: 10,
     msBlowupHold: BLOWUP_ANIMATION_MS
   };
+
+  // packages/replay/src/polar.ts
+  function polarToPinFeet(mark) {
+    const rad = mark.bearingDeg * Math.PI / 180;
+    const r = Math.max(0, mark.radiusFeet);
+    return {
+      x: r * Math.sin(rad),
+      y: r * Math.cos(rad)
+    };
+  }
+  function lerpPinFeet(from, to, t) {
+    const u = Math.max(0, Math.min(1, t));
+    return {
+      x: from.x + (to.x - from.x) * u,
+      y: from.y + (to.y - from.y) * u
+    };
+  }
+  function pinFeetRadius(p) {
+    return Math.hypot(p.x, p.y);
+  }
 
   // packages/replay/src/gps.ts
   var EARTH_RADIUS_M = 6371e3;
@@ -264,7 +290,56 @@
     const secondFeet = puttCount <= 1 ? 0 : Math.max(0, Math.round(lastYards * 3));
     return { firstFeet, secondFeet, puttCount, maxFeet: puttTrackerMaxFeet(firstFeet) };
   }
+  function asPolarMark(polar, fallbackRadiusFeet) {
+    if (!polar || !Number.isFinite(polar.bearingDeg)) return void 0;
+    const radiusFeet = Number.isFinite(polar.radiusFeet) && polar.radiusFeet >= 0 ? polar.radiusFeet : fallbackRadiusFeet;
+    if (radiusFeet == null || !(radiusFeet >= 0)) return void 0;
+    return {
+      bearingDeg: (polar.bearingDeg % 360 + 360) % 360,
+      radiusFeet
+    };
+  }
+  function buildPuttGreenMarks(stroke) {
+    var _a, _b;
+    const distances = buildPuttTrackerDistances(stroke);
+    const first = asPolarMark(stroke.firstPuttPolar, distances.firstFeet);
+    if (!first) return null;
+    const second = distances.puttCount > 1 ? asPolarMark(stroke.secondPuttPolar, distances.secondFeet || PUTT_TAP_IN_FEET) : void 0;
+    const finish = distances.puttCount > 1 ? asPolarMark(stroke.secondPuttFinishPolar, 0) : void 0;
+    const maxFeet = Math.max(
+      distances.maxFeet,
+      first.radiusFeet,
+      (_a = second == null ? void 0 : second.radiusFeet) != null ? _a : 0,
+      (_b = finish == null ? void 0 : finish.radiusFeet) != null ? _b : 0,
+      8
+    );
+    return { first, second, finish, maxFeet };
+  }
+  function pinPointForLegEnd(marks, phase, toFeet) {
+    if (phase === "track") {
+      if (marks.second) return polarToPinFeet(marks.second);
+      if (toFeet <= 0) return { x: 0, y: 0 };
+      return polarToPinFeet({ bearingDeg: marks.first.bearingDeg, radiusFeet: toFeet });
+    }
+    if (phase === "trackSecond") {
+      if (toFeet <= 0) {
+        return marks.finish ? polarToPinFeet(marks.finish) : { x: 0, y: 0 };
+      }
+      if (marks.finish) return polarToPinFeet(marks.finish);
+      return { x: 0, y: toFeet };
+    }
+    return { x: 0, y: 0 };
+  }
+  function pinPointForLegStart(marks, phase, fromFeet) {
+    if (phase === "track") return polarToPinFeet(marks.first);
+    if (phase === "trackSecond") {
+      if (marks.second) return polarToPinFeet(marks.second);
+      return polarToPinFeet({ bearingDeg: marks.first.bearingDeg, radiusFeet: fromFeet });
+    }
+    return { x: 0, y: fromFeet };
+  }
   function appendPuttTrackFrames(args) {
+    var _a;
     const {
       frames,
       hole,
@@ -276,15 +351,19 @@
       fromFeet,
       toFeet,
       distances,
+      greenMarks,
       pinLabel,
       penalty,
       holdPos,
       phase,
       puttsTaken
     } = args;
+    const fromPin = greenMarks ? pinPointForLegStart(greenMarks, phase, fromFeet) : null;
+    const toPin = greenMarks ? pinPointForLegEnd(greenMarks, phase, toFeet) : null;
     for (let i = 0; i <= frameCount; i++) {
       const t = i / frameCount;
       const currentFeet = fromFeet + (toFeet - fromFeet) * t;
+      const currentPin = fromPin && toPin ? lerpPinFeet(fromPin, toPin, t) : { x: 0, y: currentFeet };
       frames.push({
         timestamp: startTime + duration * t,
         position: holdPos,
@@ -300,13 +379,24 @@
         pinLabel,
         penalty,
         puttTracker: {
-          maxFeet: distances.maxFeet,
+          maxFeet: (_a = greenMarks == null ? void 0 : greenMarks.maxFeet) != null ? _a : distances.maxFeet,
           firstFeet: distances.firstFeet,
           secondFeet: distances.secondFeet,
           puttCount: distances.puttCount,
           puttsTaken,
-          currentFeet,
-          phase
+          currentFeet: greenMarks ? pinFeetRadius(currentPin) : currentFeet,
+          phase,
+          ...greenMarks ? {
+            green: {
+              maxFeet: greenMarks.maxFeet,
+              marks: {
+                first: greenMarks.first,
+                second: greenMarks.second,
+                finish: greenMarks.finish
+              },
+              current: currentPin
+            }
+          } : {}
         }
       });
     }
@@ -332,12 +422,13 @@
     return legs;
   }
   function appendPuttReplayFrames(args) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const { frames, hole, puttStroke, strokeNumber, config } = args;
     let currentTime = args.startTime;
     const holdPos = (_c = ((_a = puttStroke.position) == null ? void 0 : _a.latitude) && ((_b = puttStroke.position) == null ? void 0 : _b.longitude) ? puttStroke.position : null) != null ? _c : getHoleGreen(hole);
     if (!holdPos) return currentTime;
     const distances = buildPuttTrackerDistances(puttStroke);
+    const greenMarks = buildPuttGreenMarks(puttStroke);
     const { firstFeet, secondFeet, puttCount } = distances;
     const pinLabel = formatReplayPinLabel(puttStroke, null);
     const penalty = strokePenalty(puttStroke);
@@ -358,6 +449,7 @@
         fromFeet: leg.fromFeet,
         toFeet: leg.toFeet,
         distances,
+        greenMarks,
         pinLabel,
         penalty,
         holdPos,
@@ -383,13 +475,24 @@
         pinLabel,
         penalty,
         puttTracker: {
-          maxFeet: distances.maxFeet,
+          maxFeet: (_d = greenMarks == null ? void 0 : greenMarks.maxFeet) != null ? _d : distances.maxFeet,
           firstFeet,
           secondFeet,
           puttCount,
           puttsTaken: puttCount,
           currentFeet: 0,
-          phase: "result"
+          phase: "result",
+          ...greenMarks ? {
+            green: {
+              maxFeet: greenMarks.maxFeet,
+              marks: {
+                first: greenMarks.first,
+                second: greenMarks.second,
+                finish: greenMarks.finish
+              },
+              current: { x: 0, y: 0 }
+            }
+          } : {}
         }
       });
     }
@@ -397,7 +500,7 @@
     return currentTime;
   }
   function buildHoleReplayTimeline(hole, config = DEFAULT_REPLAY_CONFIG) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     const frames = [];
     let currentTime = 0;
     const strokes = (_a = hole.strokes) != null ? _a : [];
@@ -471,6 +574,8 @@
       currentTime += strokeDuration;
     }
     const lastStroke = gpsStrokes[lastIdx];
+    const green = getHoleGreen(hole);
+    const holedOutFromOffGreen = !lastIsPutt && !hole.blowup && green != null && ((_d = hole.score) != null ? _d : 0) > 0 && strokes[strokes.length - 1] === lastStroke;
     if (lastIsPutt) {
       currentTime = appendPuttReplayFrames({
         frames,
@@ -480,6 +585,31 @@
         startTime: currentTime,
         config
       });
+    } else if (holedOutFromOffGreen && lastStroke.position) {
+      const shotYards = distanceBetweenYards(lastStroke.position, green);
+      const strokeDuration = config.msPerStroke / config.speedMultiplier;
+      frames.push(
+        ...generateFlightFrames(
+          lastStroke.position,
+          green,
+          currentTime,
+          strokeDuration,
+          gpsStrokes.length,
+          hole.holeNumber,
+          lastStroke.club || "Unknown",
+          (_e = lastStroke.distanceRemaining) != null ? _e : 0,
+          lastStroke.SGA,
+          config.flightFramesPerStroke,
+          "swing",
+          {
+            lie: lastStroke.lie,
+            shotDistanceYards: shotYards,
+            pinLabel: formatReplayPinLabel(lastStroke, shotYards),
+            penalty: strokePenalty(lastStroke)
+          }
+        )
+      );
+      currentTime += strokeDuration;
     } else if (lastStroke.position) {
       frames.push({
         timestamp: currentTime,
