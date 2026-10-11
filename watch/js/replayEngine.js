@@ -185,7 +185,7 @@
     return Math.hypot(p.x, p.y);
   }
   function compassBearingToPinPlotDeg(compassBearingDeg) {
-    return ((180 - compassBearingDeg) % 360 + 360) % 360;
+    return ((compassBearingDeg - 180) % 360 + 360) % 360;
   }
   function teeBearingInPinFrameDeg(args) {
     const approachToPin = bearingDegrees(args.approach, args.pin);
