@@ -683,20 +683,28 @@
     bg.setAttribute('stroke', 'rgba(46, 100, 40, 0.55)');
     svg.appendChild(bg);
 
+    // Rotate pin-frame content so short/approach matches north-up course map (tee alignment).
+    var mapAlignDeg = typeof green.mapAlignDeg === 'number' ? green.mapAlignDeg : 0;
+    var aligned = document.createElementNS(svgNS, 'g');
+    aligned.setAttribute(
+      'transform',
+      'rotate(' + mapAlignDeg + ' ' + size / 2 + ' ' + size / 2 + ')'
+    );
+
     var axis = document.createElementNS(svgNS, 'line');
     axis.setAttribute('x1', String(size / 2));
     axis.setAttribute('y1', String(size / 2 - half));
     axis.setAttribute('x2', String(size / 2));
     axis.setAttribute('y2', String(size / 2 + half));
     axis.setAttribute('stroke', 'rgba(30, 41, 59, 0.25)');
-    svg.appendChild(axis);
+    aligned.appendChild(axis);
 
     var pin = document.createElementNS(svgNS, 'circle');
     pin.setAttribute('cx', String(size / 2));
     pin.setAttribute('cy', String(size / 2));
     pin.setAttribute('r', '3.5');
     pin.setAttribute('fill', '#0f172a');
-    svg.appendChild(pin);
+    aligned.appendChild(pin);
 
     var addMark = function (mark, r, fill) {
       if (!mark) return;
@@ -708,8 +716,30 @@
       c.setAttribute('fill', fill);
       c.setAttribute('stroke', '#fff');
       c.setAttribute('stroke-width', '1.5');
-      svg.appendChild(c);
+      aligned.appendChild(c);
     };
+
+    if (typeof green.teeBearingDeg === 'number' && isFinite(green.teeBearingDeg)) {
+      var teeXy = toXY({ bearingDeg: green.teeBearingDeg, radiusFeet: maxFeet * 0.92 });
+      var teeDot = document.createElementNS(svgNS, 'circle');
+      teeDot.setAttribute('cx', String(teeXy.x));
+      teeDot.setAttribute('cy', String(teeXy.y));
+      teeDot.setAttribute('r', '3.5');
+      teeDot.setAttribute('fill', '#475569');
+      teeDot.setAttribute('stroke', '#fff');
+      teeDot.setAttribute('stroke-width', '1');
+      aligned.appendChild(teeDot);
+      var teeLbl = document.createElementNS(svgNS, 'text');
+      teeLbl.setAttribute('x', String(teeXy.x));
+      teeLbl.setAttribute('y', String(teeXy.y - 7));
+      teeLbl.setAttribute('text-anchor', 'middle');
+      teeLbl.setAttribute('font-size', '8');
+      teeLbl.setAttribute('font-weight', '700');
+      teeLbl.setAttribute('fill', '#475569');
+      teeLbl.textContent = 'Tee';
+      aligned.appendChild(teeLbl);
+    }
+
     addMark(green.marks && green.marks.first, 5, '#14532d');
     addMark(green.marks && green.marks.second, 4.5, '#166534');
     addMark(green.marks && green.marks.finish, 4, '#86efac');
@@ -722,9 +752,10 @@
       ball.setAttribute('fill', '#14532d');
       ball.setAttribute('stroke', '#fff');
       ball.setAttribute('stroke-width', '2');
-      svg.appendChild(ball);
+      aligned.appendChild(ball);
     }
 
+    svg.appendChild(aligned);
     wrap.appendChild(svg);
     return wrap;
   }

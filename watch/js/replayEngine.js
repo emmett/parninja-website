@@ -27,13 +27,16 @@
     PUTT_TRACKER_SCALE: () => PUTT_TRACKER_SCALE,
     STYLIZED_LANDSCAPE: () => STYLIZED_LANDSCAPE,
     applyFrameToMapAdapter: () => applyFrameToMapAdapter,
+    bearingDegrees: () => bearingDegrees,
     buildHoleReplayTimeline: () => buildHoleReplayTimeline,
+    buildPuttGreenMapAlign: () => buildPuttGreenMapAlign,
     buildPuttGreenMarks: () => buildPuttGreenMarks,
     buildPuttLegs: () => buildPuttLegs,
     buildPuttTrackerDistances: () => buildPuttTrackerDistances,
     buildRoundReplayTimeline: () => buildRoundReplayTimeline,
     buildScrubberViewModel: () => buildScrubberViewModel,
     calculateProgress: () => calculateProgress,
+    compassBearingToPinPlotDeg: () => compassBearingToPinPlotDeg,
     countGpsShots: () => countGpsShots,
     createReplayController: () => createReplayController,
     distanceBetweenYards: () => distanceBetweenYards,
@@ -54,6 +57,7 @@
     getZoomLevelForClub: () => getZoomLevelForClub,
     hasReplayableGpsData: () => hasReplayableGpsData,
     interpolateFlightPath: () => interpolateFlightPath,
+    lastNonPuttPosition: () => lastNonPuttPosition,
     lerpPinFeet: () => lerpPinFeet,
     nextPlaybackSpeed: () => nextPlaybackSpeed,
     normalizeRoundForReplay: () => normalizeRoundForReplay,
@@ -61,6 +65,7 @@
     polarToPinFeet: () => polarToPinFeet,
     puttTrackerMaxFeet: () => puttTrackerMaxFeet,
     regionFramingPoints: () => regionFramingPoints,
+    teeBearingInPinFrameDeg: () => teeBearingInPinFrameDeg,
     toReplayMapFrame: () => toReplayMapFrame
   });
 
@@ -102,26 +107,6 @@
     msBlowupHold: BLOWUP_ANIMATION_MS
   };
 
-  // packages/replay/src/polar.ts
-  function polarToPinFeet(mark) {
-    const rad = mark.bearingDeg * Math.PI / 180;
-    const r = Math.max(0, mark.radiusFeet);
-    return {
-      x: r * Math.sin(rad),
-      y: r * Math.cos(rad)
-    };
-  }
-  function lerpPinFeet(from, to, t) {
-    const u = Math.max(0, Math.min(1, t));
-    return {
-      x: from.x + (to.x - from.x) * u,
-      y: from.y + (to.y - from.y) * u
-    };
-  }
-  function pinFeetRadius(p) {
-    return Math.hypot(p.x, p.y);
-  }
-
   // packages/replay/src/gps.ts
   var EARTH_RADIUS_M = 6371e3;
   var METERS_TO_YARDS = 1.09361;
@@ -154,6 +139,73 @@
   }
   function getHoleGreen(hole) {
     return isValidGpsPosition(hole.greenPosition) ? hole.greenPosition : null;
+  }
+  function bearingDegrees(from, to) {
+    const toRad = (deg) => deg * Math.PI / 180;
+    const dLon = toRad(to.longitude - from.longitude);
+    const lat1 = toRad(from.latitude);
+    const lat2 = toRad(to.latitude);
+    const y = Math.sin(dLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    if (!Number.isFinite(y) || !Number.isFinite(x)) return 0;
+    const bearing = Math.atan2(y, x) * 180 / Math.PI;
+    if (!Number.isFinite(bearing)) return 0;
+    return (bearing + 360) % 360;
+  }
+  function lastNonPuttPosition(hole, beforeStrokeIdx) {
+    var _a;
+    const strokes = (_a = hole.strokes) != null ? _a : [];
+    const end = typeof beforeStrokeIdx === "number" && beforeStrokeIdx >= 0 ? beforeStrokeIdx : strokes.length;
+    for (let i = end - 1; i >= 0; i -= 1) {
+      const s = strokes[i];
+      if (!s) continue;
+      if (s.club === "PU" || s.lie === "Green") continue;
+      if (isValidGpsPosition(s.position)) return s.position;
+    }
+    return null;
+  }
+
+  // packages/replay/src/polar.ts
+  function polarToPinFeet(mark) {
+    const rad = mark.bearingDeg * Math.PI / 180;
+    const r = Math.max(0, mark.radiusFeet);
+    return {
+      x: r * Math.sin(rad),
+      y: r * Math.cos(rad)
+    };
+  }
+  function lerpPinFeet(from, to, t) {
+    const u = Math.max(0, Math.min(1, t));
+    return {
+      x: from.x + (to.x - from.x) * u,
+      y: from.y + (to.y - from.y) * u
+    };
+  }
+  function pinFeetRadius(p) {
+    return Math.hypot(p.x, p.y);
+  }
+  function compassBearingToPinPlotDeg(compassBearingDeg) {
+    return ((180 - compassBearingDeg) % 360 + 360) % 360;
+  }
+  function teeBearingInPinFrameDeg(args) {
+    const approachToPin = bearingDegrees(args.approach, args.pin);
+    const teeToPin = bearingDegrees(args.tee, args.pin);
+    return (approachToPin - teeToPin + 360) % 360;
+  }
+  function buildPuttGreenMapAlign(hole, puttStrokeIndex) {
+    const pin = getHoleGreen(hole);
+    const approach = lastNonPuttPosition(hole, puttStrokeIndex);
+    const tee = getHoleOrigin(hole);
+    let mapAlignDeg = 0;
+    if (pin && approach) {
+      const geoShort = bearingDegrees(pin, approach);
+      mapAlignDeg = compassBearingToPinPlotDeg(geoShort);
+    } else if (pin && tee) {
+      const geoTee = bearingDegrees(pin, tee);
+      mapAlignDeg = compassBearingToPinPlotDeg(geoTee);
+    }
+    const teeBearingDeg = pin && approach && tee ? teeBearingInPinFrameDeg({ pin, approach, tee }) : null;
+    return { mapAlignDeg, teeBearingDeg };
   }
 
   // packages/replay/src/framing.ts
@@ -338,6 +390,19 @@
     }
     return { x: 0, y: fromFeet };
   }
+  function green2dState(greenMarks, mapAlign, current) {
+    return {
+      maxFeet: greenMarks.maxFeet,
+      marks: {
+        first: greenMarks.first,
+        second: greenMarks.second,
+        finish: greenMarks.finish
+      },
+      current,
+      mapAlignDeg: mapAlign.mapAlignDeg,
+      teeBearingDeg: mapAlign.teeBearingDeg
+    };
+  }
   function appendPuttTrackFrames(args) {
     var _a;
     const {
@@ -352,6 +417,7 @@
       toFeet,
       distances,
       greenMarks,
+      mapAlign,
       pinLabel,
       penalty,
       holdPos,
@@ -386,17 +452,7 @@
           puttsTaken,
           currentFeet: greenMarks ? pinFeetRadius(currentPin) : currentFeet,
           phase,
-          ...greenMarks ? {
-            green: {
-              maxFeet: greenMarks.maxFeet,
-              marks: {
-                first: greenMarks.first,
-                second: greenMarks.second,
-                finish: greenMarks.finish
-              },
-              current: currentPin
-            }
-          } : {}
+          ...greenMarks ? { green: green2dState(greenMarks, mapAlign, currentPin) } : {}
         }
       });
     }
@@ -422,13 +478,15 @@
     return legs;
   }
   function appendPuttReplayFrames(args) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const { frames, hole, puttStroke, strokeNumber, config } = args;
     let currentTime = args.startTime;
     const holdPos = (_c = ((_a = puttStroke.position) == null ? void 0 : _a.latitude) && ((_b = puttStroke.position) == null ? void 0 : _b.longitude) ? puttStroke.position : null) != null ? _c : getHoleGreen(hole);
     if (!holdPos) return currentTime;
     const distances = buildPuttTrackerDistances(puttStroke);
     const greenMarks = buildPuttGreenMarks(puttStroke);
+    const puttIdx = ((_d = hole.strokes) != null ? _d : []).indexOf(puttStroke);
+    const mapAlign = buildPuttGreenMapAlign(hole, puttIdx >= 0 ? puttIdx : null);
     const { firstFeet, secondFeet, puttCount } = distances;
     const pinLabel = formatReplayPinLabel(puttStroke, null);
     const penalty = strokePenalty(puttStroke);
@@ -450,6 +508,7 @@
         toFeet: leg.toFeet,
         distances,
         greenMarks,
+        mapAlign,
         pinLabel,
         penalty,
         holdPos,
@@ -475,24 +534,14 @@
         pinLabel,
         penalty,
         puttTracker: {
-          maxFeet: (_d = greenMarks == null ? void 0 : greenMarks.maxFeet) != null ? _d : distances.maxFeet,
+          maxFeet: (_e = greenMarks == null ? void 0 : greenMarks.maxFeet) != null ? _e : distances.maxFeet,
           firstFeet,
           secondFeet,
           puttCount,
           puttsTaken: puttCount,
           currentFeet: 0,
           phase: "result",
-          ...greenMarks ? {
-            green: {
-              maxFeet: greenMarks.maxFeet,
-              marks: {
-                first: greenMarks.first,
-                second: greenMarks.second,
-                finish: greenMarks.finish
-              },
-              current: { x: 0, y: 0 }
-            }
-          } : {}
+          ...greenMarks ? { green: green2dState(greenMarks, mapAlign, { x: 0, y: 0 }) } : {}
         }
       });
     }
