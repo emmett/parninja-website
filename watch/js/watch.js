@@ -706,6 +706,23 @@
     pin.setAttribute('fill', '#0f172a');
     aligned.appendChild(pin);
 
+    // Pin flag (matches native PuttGreenTracker).
+    var pole = document.createElementNS(svgNS, 'line');
+    pole.setAttribute('x1', String(size / 2));
+    pole.setAttribute('y1', String(size / 2));
+    pole.setAttribute('x2', String(size / 2));
+    pole.setAttribute('y2', String(size / 2 - 16));
+    pole.setAttribute('stroke', '#111827');
+    pole.setAttribute('stroke-width', '1.75');
+    pole.setAttribute('stroke-linecap', 'round');
+    aligned.appendChild(pole);
+    var flag = document.createElementNS(svgNS, 'path');
+    var fx = size / 2;
+    var fy = size / 2 - 16;
+    flag.setAttribute('d', 'M ' + fx + ' ' + fy + ' L ' + (fx + 10) + ' ' + (fy + 4) + ' L ' + fx + ' ' + (fy + 8) + ' Z');
+    flag.setAttribute('fill', '#dc2626');
+    aligned.appendChild(flag);
+
     var addMark = function (mark, r, fill) {
       if (!mark) return;
       var xy = toXY(mark);
