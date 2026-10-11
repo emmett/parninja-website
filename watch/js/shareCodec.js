@@ -460,6 +460,8 @@
         par: par,
         blowup: blowup,
         score: blowup ? par * 2 : strokes.length ? score : null,
+        // Tee + green µdeg are required for putt mapAlign / tee bug (same as app expandWatchV2Pack).
+        teePosition: { latitude: teeLat, longitude: teeLng },
         greenPosition: { latitude: greenLat, longitude: greenLng },
         strokes: strokes,
       });
