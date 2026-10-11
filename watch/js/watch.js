@@ -527,11 +527,13 @@
   }
 
   /**
-   * Ball between the two engine frames around `t`. The engine keeps ~10 frames per stroke
-   * and getFrameAtTime snaps to the nearest one, which steps every ~200ms and can sit
-   * ahead of the drawn trail.
+   * Ball between engine frames around `t` (shared with app via ReplayEngine).
+   * Fallback keeps /watch working if an older IIFE is cached.
    */
   function ballAt(t) {
+    if (ReplayEngine.interpolateBallAtTime && state.timeline) {
+      return ReplayEngine.interpolateBallAtTime(state.timeline, t);
+    }
     var frames = state.frames;
     if (!frames.length) return null;
     var lo = 0;
@@ -563,6 +565,9 @@
 
   /** Trail up to `t` for this hole, ending exactly at the ball. */
   function trailTo(t, holeNumber, ball) {
+    if (ReplayEngine.getReplaySwingTrail && state.timeline) {
+      return ReplayEngine.getReplaySwingTrail(state.timeline, t, holeNumber);
+    }
     var segments = ReplayEngine.getReplayPathSegments(state.timeline, t).filter(function (s) {
       return s.kind === 'swing' && s.holeNumber === holeNumber && s.coordinates.length >= 2;
     });

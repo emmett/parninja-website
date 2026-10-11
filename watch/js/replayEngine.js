@@ -19,6 +19,7 @@
     FRAME_MS: () => FRAME_MS,
     HOLE_PATH_POLYLINE: () => HOLE_PATH_POLYLINE,
     MAP_VIEWPORT_SAFE_INSET: () => MAP_VIEWPORT_SAFE_INSET,
+    MAX_PLAY_STEP_MS: () => MAX_PLAY_STEP_MS,
     MIN_LATITUDE_DELTA: () => MIN_LATITUDE_DELTA,
     PLAYBACK_SPEEDS: () => PLAYBACK_SPEEDS,
     PUTT_TAP_IN_BEAT_MS: () => PUTT_TAP_IN_BEAT_MS,
@@ -53,9 +54,11 @@
     getPrevStrokeTime: () => getPrevStrokeTime,
     getReplayPathSegments: () => getReplayPathSegments,
     getReplayPins: () => getReplayPins,
+    getReplaySwingTrail: () => getReplaySwingTrail,
     getStrokeStartTimes: () => getStrokeStartTimes,
     getZoomLevelForClub: () => getZoomLevelForClub,
     hasReplayableGpsData: () => hasReplayableGpsData,
+    interpolateBallAtTime: () => interpolateBallAtTime,
     interpolateFlightPath: () => interpolateFlightPath,
     lastNonPuttPosition: () => lastNonPuttPosition,
     lerpPinFeet: () => lerpPinFeet,
@@ -81,6 +84,7 @@
   var MAP_VIEWPORT_SAFE_INSET = 0.18;
   var MIN_LATITUDE_DELTA = 25e-4;
   var FRAME_MS = 33;
+  var MAX_PLAY_STEP_MS = 100;
   var PLAYBACK_SPEEDS = [1, 2, 4];
   function nextPlaybackSpeed(current) {
     if (current === 1) return 2;
@@ -968,6 +972,78 @@
     if (current) pushSegmentIfUseful(current);
     return segments;
   }
+  function interpolateBallAtTime(timeline, timestamp) {
+    const frames = timeline.frames;
+    if (!frames.length) return null;
+    const t = Math.max(0, Math.min(timestamp, timeline.duration));
+    let lo = 0;
+    let hi = frames.length - 1;
+    if (t < frames[0].timestamp) {
+      const f = frames[0];
+      return {
+        position: f.position,
+        from: f.position,
+        pathKind: f.pathKind,
+        holeNumber: f.holeNumber
+      };
+    }
+    while (lo < hi) {
+      const mid = lo + hi + 1 >> 1;
+      if (frames[mid].timestamp <= t) lo = mid;
+      else hi = mid - 1;
+    }
+    const a = frames[lo];
+    const b = frames[lo + 1];
+    let position = a.position;
+    if (b && b.timestamp > a.timestamp && b.holeNumber === a.holeNumber && b.strokeNumber === a.strokeNumber && b.pathKind === a.pathKind) {
+      const u = Math.max(0, Math.min(1, (t - a.timestamp) / (b.timestamp - a.timestamp)));
+      position = {
+        latitude: a.position.latitude + (b.position.latitude - a.position.latitude) * u,
+        longitude: a.position.longitude + (b.position.longitude - a.position.longitude) * u
+      };
+    }
+    return {
+      position,
+      from: a.position,
+      pathKind: a.pathKind,
+      holeNumber: a.holeNumber
+    };
+  }
+  function getReplaySwingTrail(timeline, upToTime, holeNumber) {
+    const ball = interpolateBallAtTime(timeline, upToTime);
+    const segments = getReplayPathSegments(timeline, upToTime).filter(
+      (s) => s.kind === "swing" && s.holeNumber === holeNumber && s.coordinates.length >= 2
+    );
+    if (!ball || ball.pathKind !== "swing" || ball.holeNumber !== holeNumber) {
+      return segments;
+    }
+    const tip = ball.position;
+    const last = segments[segments.length - 1];
+    if (last) {
+      const end = last.coordinates[last.coordinates.length - 1];
+      if (end.latitude !== tip.latitude || end.longitude !== tip.longitude) {
+        return [
+          ...segments.slice(0, -1),
+          {
+            kind: last.kind,
+            holeNumber: last.holeNumber,
+            coordinates: last.coordinates.concat([tip])
+          }
+        ];
+      }
+      return segments;
+    }
+    if (ball.from.latitude !== tip.latitude || ball.from.longitude !== tip.longitude) {
+      return [
+        {
+          kind: "swing",
+          holeNumber,
+          coordinates: [ball.from, tip]
+        }
+      ];
+    }
+    return segments;
+  }
   function getReplayPins(timeline, upToTime) {
     const pins = [];
     for (const frame of timeline.frames) {
@@ -1130,9 +1206,8 @@
         currentTime: state.currentTime,
         frame
       });
-      const pathSegments = holeNumber == null ? [] : getReplayPathSegments(state.timeline, state.currentTime).filter(
-        (s) => s.kind === "swing" && s.holeNumber === holeNumber && s.coordinates.length >= 2
-      );
+      const pathSegments = holeNumber == null ? [] : getReplaySwingTrail(state.timeline, state.currentTime, holeNumber);
+      const ball = interpolateBallAtTime(state.timeline, state.currentTime);
       const pins = holeNumber == null ? [] : getReplayPins(state.timeline, state.currentTime).filter(
         (p) => p.holeNumber === holeNumber
       );
@@ -1149,6 +1224,7 @@
         scrubber,
         pathSegments,
         pins,
+        ball,
         yardsRemaining,
         cameraRegion,
         pathStyle: HOLE_PATH_POLYLINE,
@@ -1183,7 +1259,7 @@
 
   // packages/replay/src/applyFrame.ts
   function applyFrameToMapAdapter(adapter, vm, opts) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     const holeChanged = vm.holeNumber != null && (opts == null ? void 0 : opts.previousHoleNumber) != null && vm.holeNumber !== opts.previousHoleNumber;
     if (holeChanged) {
       adapter.clearHoleOverlays();
@@ -1205,13 +1281,13 @@
       offsetIndex
     }));
     adapter.setPins(pins);
-    adapter.setBall((_b = (_a = vm.frame) == null ? void 0 : _a.position) != null ? _b : null);
-    const tracker = ((_c = vm.frame) == null ? void 0 : _c.pathKind) === "putt" ? (_d = vm.frame.puttTracker) != null ? _d : null : null;
-    adapter.setPuttOverlay(tracker, (_e = opts == null ? void 0 : opts.puttAnchor) != null ? _e : null);
+    adapter.setBall((_d = (_c = (_a = vm.ball) == null ? void 0 : _a.position) != null ? _c : (_b = vm.frame) == null ? void 0 : _b.position) != null ? _d : null);
+    const tracker = ((_e = vm.frame) == null ? void 0 : _e.pathKind) === "putt" ? (_f = vm.frame.puttTracker) != null ? _f : null : null;
+    adapter.setPuttOverlay(tracker, (_g = opts == null ? void 0 : opts.puttAnchor) != null ? _g : null);
     return { holeNumber: vm.holeNumber };
   }
   function toReplayMapFrame(vm, opts) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     return {
       holeNumber: vm.holeNumber,
       cameraRegion: vm.cameraRegion,
@@ -1224,10 +1300,10 @@
         selected: vm.frame ? pin.strokeNumber === vm.frame.strokeNumber : false,
         offsetIndex
       })),
-      ball: (_b = (_a = vm.frame) == null ? void 0 : _a.position) != null ? _b : null,
+      ball: (_d = (_c = (_a = vm.ball) == null ? void 0 : _a.position) != null ? _c : (_b = vm.frame) == null ? void 0 : _b.position) != null ? _d : null,
       yardsRemaining: vm.yardsRemaining,
-      puttTracker: ((_c = vm.frame) == null ? void 0 : _c.pathKind) === "putt" ? (_d = vm.frame.puttTracker) != null ? _d : null : null,
-      puttAnchor: (_e = opts == null ? void 0 : opts.puttAnchor) != null ? _e : null
+      puttTracker: ((_e = vm.frame) == null ? void 0 : _e.pathKind) === "putt" ? (_f = vm.frame.puttTracker) != null ? _f : null : null,
+      puttAnchor: (_g = opts == null ? void 0 : opts.puttAnchor) != null ? _g : null
     };
   }
 
