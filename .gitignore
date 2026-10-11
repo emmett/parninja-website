@@ -1,2 +1,5 @@
 .DS_Store
 *.log
+
+# Local share codec dumps (not committed fixtures)
+watch/fixtures/share-out-*/
