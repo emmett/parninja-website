@@ -159,7 +159,7 @@
     for (let i = end - 1; i >= 0; i -= 1) {
       const s = strokes[i];
       if (!s) continue;
-      if (s.club === "PU" || s.lie === "Green") continue;
+      if (s.club === "PU" && s.lie === "Green") continue;
       if (isValidGpsPosition(s.position)) return s.position;
     }
     return null;
@@ -367,6 +367,12 @@
     );
     return { first, second, finish, maxFeet };
   }
+  function scalePinToRadius(anchor, radiusFeet) {
+    const r = pinFeetRadius(anchor);
+    if (!(r > 1e-6)) return { x: 0, y: Math.max(0, radiusFeet) };
+    const s = Math.max(0, radiusFeet) / r;
+    return { x: anchor.x * s, y: anchor.y * s };
+  }
   function pinPointForLegEnd(marks, phase, toFeet) {
     if (phase === "track") {
       if (marks.second) return polarToPinFeet(marks.second);
@@ -378,6 +384,7 @@
         return marks.finish ? polarToPinFeet(marks.finish) : { x: 0, y: 0 };
       }
       if (marks.finish) return polarToPinFeet(marks.finish);
+      if (marks.second) return scalePinToRadius(polarToPinFeet(marks.second), toFeet);
       return { x: 0, y: toFeet };
     }
     return { x: 0, y: 0 };
@@ -388,6 +395,8 @@
       if (marks.second) return polarToPinFeet(marks.second);
       return polarToPinFeet({ bearingDeg: marks.first.bearingDeg, radiusFeet: fromFeet });
     }
+    if (marks.finish) return polarToPinFeet(marks.finish);
+    if (marks.second) return scalePinToRadius(polarToPinFeet(marks.second), fromFeet);
     return { x: 0, y: fromFeet };
   }
   function green2dState(greenMarks, mapAlign, current) {
